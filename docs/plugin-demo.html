@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TestHistory Demo Plugin</title>
+    <style>
+      :root { --bg: #fff; --fg: #111; --muted: #667085; --border: #e3e6ea; --pass: #16a34a; --fail: #dc2626; }
+      body { margin: 0; padding: 16px; font: 14px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+      h1 { font-size: 18px; margin: 0 0 4px; }
+      p.sub { color: var(--muted); margin: 0 0 16px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+      th { color: var(--muted); font-weight: 600; }
+      .err { color: var(--fail); }
+      .bar { height: 8px; background: var(--pass); border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1 id="title">Slowest tests</h1>
+    <p class="sub" id="sub">Loading…</p>
+    <div id="content"></div>
+
+    <script>
+      // --- TH.query() helper (from docs/plugin-api.md) ---
+      const TH = (() => {
+        let seq = 0;
+        const pending = new Map();
+        let theme = null, project = null;
+        window.addEventListener('message', (e) => {
+          const m = e.data;
+          if (!m || typeof m !== 'object') return;
+          if (m.type === 'th-init') { theme = m.theme; project = m.project; (TH.oninit || (() => {}))(m); }
+          else if (m.type === 'th-result') {
+            const p = pending.get(m.id); if (!p) return; pending.delete(m.id);
+            m.ok ? p.resolve(m) : p.reject(new Error(m.error.code + ': ' + m.error.message));
+          }
+        });
+        const TH = {
+          oninit: null,
+          get theme() { return theme; },
+          get project() { return project; },
+          query(sql, params) {
+            const id = 'q' + ++seq;
+            return new Promise((resolve, reject) => {
+              pending.set(id, { resolve, reject });
+              parent.postMessage({ type: 'th-query', id, sql, params }, '*');
+            });
+          },
+        };
+        parent.postMessage({ type: 'th-ready' }, '*');
+        return TH;
+      })();
+
+      TH.oninit = (init) => {
+        // Adopt the host theme.
+        const v = init.theme.vars || {};
+        const root = document.documentElement.style;
+        for (const k of ['bg', 'fg', 'muted', 'border', 'pass', 'fail']) if (v[k]) root.setProperty('--' + k, v[k]);
+        document.getElementById('sub').textContent = 'Project: ' + (init.project?.name ?? '');
+        run();
+      };
+
+      async function run() {
+        try {
+          const res = await TH.query(
+            `SELECT t.suite, t.name, MAX(r.duration_ms) AS ms
+               FROM results r JOIN tests t ON t.id = r.test_id
+              WHERE r.duration_ms IS NOT NULL
+              GROUP BY r.test_id
+              ORDER BY ms DESC
+              LIMIT 20`
+          );
+          const max = res.rows.reduce((m, row) => Math.max(m, row[2] || 0), 0) || 1;
+          const rows = res.rows
+            .map(
+              (row) =>
+                `<tr><td>${esc(row[0])}</td><td>${esc(row[1])}</td>
+                 <td>${(row[2] ?? 0).toFixed(0)} ms</td>
+                 <td style="width:120px"><div class="bar" style="width:${((row[2] || 0) / max) * 100}%"></div></td></tr>`
+            )
+            .join('');
+          document.getElementById('content').innerHTML = res.rows.length
+            ? `<table><thead><tr><th>Suite</th><th>Test</th><th>Max duration</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+            : '<p>No timing data yet.</p>';
+        } catch (e) {
+          document.getElementById('content').innerHTML = '<p class="err">' + esc(String(e.message || e)) + '</p>';
+        }
+      }
+
+      function esc(s) {
+        return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      }
+    </script>
+  </body>
+</html>
