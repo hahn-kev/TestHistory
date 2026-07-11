@@ -44,17 +44,25 @@ export interface TokenInfo {
   revokedAt: string | null;
 }
 
+/** One uploaded file's facts within a Run (ADR-0001: a Run is fed by 1+ Uploads). */
+export interface UploadInfo {
+  fileName: string | null;
+  fileSize: number | null;
+  format: ResultFormat;
+  durationMs: number | null;
+  uploadedAt: string;
+}
+
 export interface RunSummary {
   id: number;
   createdAt: string;
   startedAt: string | null;
   durationMs: number | null;
-  format: ResultFormat;
   label: string | null;
   branch: string | null;
   commitSha: string | null;
   ciUrl: string | null;
-  fileName: string | null;
+  uploads: UploadInfo[];
   total: number;
   passed: number;
   failed: number;

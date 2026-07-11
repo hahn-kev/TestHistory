@@ -11,12 +11,17 @@ import { adminUserRoutes } from './routes/admin-users.js';
 import { projectRoutes } from './routes/projects.js';
 import { memberRoutes } from './routes/members.js';
 import { tokenRoutes } from './routes/tokens.js';
+import { uploadRoutes } from './routes/uploads.js';
+import { IngestService, sweepTmpDir } from './ingest/queue.js';
+import { registerErrorHandler } from './lib/errors.js';
+import { tmpDir } from './config.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
     config: AppConfig;
     core: Db;
     dbManager: DbManager;
+    ingest: IngestService;
   }
 }
 
@@ -38,6 +43,13 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
   dbManager.migrateAll();
   app.decorate('dbManager', dbManager);
 
+  // Sweep any temp files left by an interrupted ingest, then stand up the pool.
+  sweepTmpDir(tmpDir(config.dataDir));
+  const ingestService = new IngestService(2, config.ingestTimeoutMs);
+  app.decorate('ingest', ingestService);
+
+  registerErrorHandler(app);
+
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
 
@@ -55,6 +67,7 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
   await app.register(projectRoutes);
   await app.register(memberRoutes);
   await app.register(tokenRoutes);
+  await app.register(uploadRoutes);
 
   // Daily expired-session sweep (unref'd so it never holds the process open).
   const sweepTimer = setInterval(() => {
@@ -68,6 +81,7 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
 
   app.addHook('onClose', async () => {
     clearInterval(sweepTimer);
+    await ingestService.destroy();
     dbManager.closeAll();
     core.close();
   });

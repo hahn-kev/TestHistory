@@ -25,7 +25,8 @@ export class DbManager {
     fs.mkdirSync(this.dir, { recursive: true });
   }
 
-  private pathFor(projectId: string): string {
+  /** Absolute file path for a project's DB (used by ingest/query workers). */
+  pathFor(projectId: string): string {
     if (!isSafeId(projectId)) throw new Error(`unsafe project id: ${projectId}`);
     return path.join(this.dir, `${projectId}.db`);
   }
