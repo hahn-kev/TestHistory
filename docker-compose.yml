@@ -1,0 +1,18 @@
+services:
+  testhistory:
+    build: .
+    image: testhistory:latest
+    ports:
+      - '3000:3000'
+    volumes:
+      - testhistory-data:/data
+    environment:
+      # Auto-generated into /data/secret on first boot if unset. Set explicitly
+      # in production so sessions/signed URLs survive a volume-less redeploy.
+      # SESSION_SECRET: "change-me"
+      RUN_APPEND_WINDOW_MS: '3600000'
+      SESSION_TTL_DAYS: '30'
+    restart: unless-stopped
+
+volumes:
+  testhistory-data:

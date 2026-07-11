@@ -18,6 +18,7 @@ import { nameRuleRoutes } from './routes/name-rules.js';
 import { pluginRoutes } from './routes/plugins.js';
 import { IngestService, sweepTmpDir } from './ingest/queue.js';
 import { QueryService } from './query/pool.js';
+import { registerStatic } from './static.js';
 import { registerErrorHandler } from './lib/errors.js';
 import { tmpDir } from './config.js';
 
@@ -83,6 +84,7 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
   await app.register(readRoutes);
   await app.register(nameRuleRoutes);
   await app.register(pluginRoutes);
+  await registerStatic(app);
 
   // Daily expired-session sweep (unref'd so it never holds the process open).
   const sweepTimer = setInterval(() => {
