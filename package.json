@@ -10,8 +10,10 @@
   ],
   "scripts": {
     "build": "npm run build -w shared && npm run build -w server && npm run build -w web",
+    "dev": "node scripts/dev.mjs",
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
+    "typecheck": "npm run build -w shared && tsc -p server/tsconfig.json --noEmit && tsc -p web/tsconfig.json",
     "test": "npm run test -w server",
     "start": "node server/dist/index.js"
   }

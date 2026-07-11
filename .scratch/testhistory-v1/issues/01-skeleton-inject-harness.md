@@ -6,9 +6,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] `npm install` at the root wires the three workspaces (`shared`, `server`, `web`) together; `shared` is importable from `server` and `web`.
-- [ ] `server` exposes a `buildApp(config)` factory returning a configured Fastify instance (not a started listener), plus an entrypoint that starts it. `GET /api/health` returns `200 {ok:true}`.
-- [ ] `web` is a Vite + React 18 app that builds, with its dev server proxying `/api/*` to the server.
-- [ ] `npm run dev` starts both server and web together.
-- [ ] A vitest test uses `app.inject()` against the health route and passes — the reusable pattern (build app with a temp `DATA_DIR`, inject, assert) is in place.
-- [ ] `tsconfig.base.json` is honored across workspaces; `npm run build` and typecheck succeed with no errors.
+- [x] `npm install` at the root wires the three workspaces (`shared`, `server`, `web`) together; `shared` is importable from `server` and `web`.
+- [x] `server` exposes a `buildApp(config)` factory returning a configured Fastify instance (not a started listener), plus an entrypoint that starts it. `GET /api/health` returns `200 {ok:true}`.
+- [x] `web` is a Vite + React 18 app that builds, with its dev server proxying `/api/*` to the server.
+- [x] `npm run dev` starts both server and web together.
+- [x] A vitest test uses `app.inject()` against the health route and passes — the reusable pattern (build app with a temp `DATA_DIR`, inject, assert) is in place.
+- [x] `tsconfig.base.json` is honored across workspaces; `npm run build` and typecheck succeed with no errors.
