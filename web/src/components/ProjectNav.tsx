@@ -1,13 +1,17 @@
 import { NavLink } from 'react-router-dom';
 import type { ProjectInfo } from '@testhistory/shared';
+import { useAuth } from '../auth/AuthContext.js';
+import { GearIcon } from '../ui.js';
 
 const tab = 'rounded-md px-3 py-1.5 text-sm';
 const active = 'bg-primary text-primary-fg';
 const idle = 'text-muted hover:bg-surface-2';
 
 export function ProjectNav({ project }: { project: ProjectInfo }) {
+  const { user } = useAuth();
   const base = `/projects/${project.id}`;
-  const canManage = project.myRole !== null; // members/owners; admins see it too via API
+  // Members/owners manage the project; admins are implicit owners (myRole is null).
+  const canManage = project.myRole !== null || user?.role === 'admin';
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div>
@@ -17,7 +21,7 @@ export function ProjectNav({ project }: { project: ProjectInfo }) {
         </div>
         {project.description && <p className="mt-1 text-sm text-muted">{project.description}</p>}
       </div>
-      <nav className="flex gap-1">
+      <nav className="flex items-center gap-1">
         <NavLink end to={base} className={({ isActive }) => `${tab} ${isActive ? active : idle}`}>
           Overview
         </NavLink>
@@ -25,8 +29,15 @@ export function ProjectNav({ project }: { project: ProjectInfo }) {
           Flaky
         </NavLink>
         {canManage && (
-          <NavLink to={`${base}/settings`} className={({ isActive }) => `${tab} ${isActive ? active : idle}`}>
-            Settings
+          <NavLink
+            to={`${base}/settings`}
+            title="Project settings"
+            aria-label="Project settings"
+            className={({ isActive }) =>
+              `ml-1 rounded-md border border-border p-2 ${isActive ? 'bg-primary text-primary-fg' : 'text-muted hover:bg-surface-2 hover:text-fg'}`
+            }
+          >
+            <GearIcon />
           </NavLink>
         )}
       </nav>

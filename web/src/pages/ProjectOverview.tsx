@@ -74,12 +74,6 @@ export function ProjectOverviewPage() {
           </table>
         </Card>
       )}
-
-      <div>
-        <Link to={`/projects/${id}/settings`} className="text-sm text-muted hover:text-fg">
-          Search tests & manage project →
-        </Link>
-      </div>
     </div>
   );
 }
