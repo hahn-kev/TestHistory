@@ -14,6 +14,10 @@ export interface AppConfig {
   queryMaxBytes: number;
   queryTimeoutMs: number;
   ingestTimeoutMs: number;
+  /** How long after a Run's creation further uploads may append to it. */
+  runAppendWindowMs: number;
+  /** Session sliding-expiry length in days. */
+  sessionTtlDays: number;
 }
 
 export function resolveConfig(overrides: Partial<AppConfig> = {}): AppConfig {
@@ -41,6 +45,8 @@ export function resolveConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     queryMaxBytes: overrides.queryMaxBytes ?? envInt('QUERY_MAX_BYTES', 5 * 1024 * 1024),
     queryTimeoutMs: overrides.queryTimeoutMs ?? envInt('QUERY_TIMEOUT_MS', 2_000),
     ingestTimeoutMs: overrides.ingestTimeoutMs ?? envInt('INGEST_TIMEOUT_MS', 5 * 60_000),
+    runAppendWindowMs: overrides.runAppendWindowMs ?? envInt('RUN_APPEND_WINDOW_MS', 3_600_000),
+    sessionTtlDays: overrides.sessionTtlDays ?? envInt('SESSION_TTL_DAYS', 30),
   };
 }
 
