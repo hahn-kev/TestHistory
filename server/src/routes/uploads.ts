@@ -1,9 +1,11 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import multipart from '@fastify/multipart';
 import { AppError } from '../lib/errors.js';
 import { requireProject, type ProjectRow } from '../auth/project-access.js';
 import { bearerFrom, resolveToken } from '../auth/tokens.js';
 import { detect } from '../ingest/detect.js';
 import { tmpDir } from '../config.js';
+import { streamToTempFile } from '../lib/stream-to-file.js';
 import type { IngestFile, IngestMeta } from '../ingest/types.js';
 import { nowIso } from '../lib/ids.js';
 
@@ -44,6 +46,37 @@ function queryStr(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 ? v : null;
 }
 
+/**
+ * Consume a multipart request: stream every `file` field to its own temp file
+ * (detecting format per file, honoring a global `format` override) and collect
+ * text fields. All files merge into one Run downstream.
+ */
+async function collectMultipart(
+  req: FastifyRequest,
+  dir: string,
+  maxBytes: number,
+  files: IngestFile[],
+  fields: Record<string, string>,
+  formatOverride: string | null,
+): Promise<void> {
+  for await (const part of req.parts()) {
+    if (part.type === 'file') {
+      const { tempPath, size } = await streamToTempFile(part.file, dir, maxBytes);
+      (req.tempFiles ??= []).push(tempPath);
+      if ((part.file as { truncated?: boolean }).truncated) {
+        throw new AppError(413, 'TOO_LARGE', 'Upload exceeds the maximum allowed size.');
+      }
+      const format = detect(tempPath, formatOverride ?? undefined);
+      if (!format) {
+        throw new AppError(415, 'UNKNOWN_FORMAT', `Could not determine the format of ${part.filename ?? 'an upload'}.`);
+      }
+      files.push({ tempPath, fileName: part.filename ?? null, fileSize: size, format });
+    } else {
+      fields[part.fieldname] = String((part as { value: unknown }).value);
+    }
+  }
+}
+
 /** Map an ingest worker/queue error (carrying a `.code`) to an HTTP AppError. */
 function mapIngestError(e: unknown): AppError {
   if (e instanceof AppError) return e;
@@ -63,6 +96,8 @@ function mapIngestError(e: unknown): AppError {
 
 export async function uploadRoutes(app: FastifyInstance) {
   const dir = tmpDir(app.config.dataDir);
+
+  await app.register(multipart, { limits: { fileSize: app.config.maxUploadBytes } });
 
   // Raw-body parser: stream application/xml (and text/xml) to a temp file.
   const rawParser = async (req: FastifyRequest, payload: NodeJS.ReadableStream) => {
@@ -95,26 +130,35 @@ export async function uploadRoutes(app: FastifyInstance) {
       const project = req.project!;
       const q = req.query as Record<string, string>;
 
-      const body = req.body as RawBody | undefined;
-      if (!body || typeof body.tempPath !== 'string') {
-        throw new AppError(415, 'UNKNOWN_FORMAT', 'Send an XML body (application/xml) or a multipart upload.');
+      const files: IngestFile[] = [];
+      // Fields override query params when both are present (multipart form fields).
+      const fields: Record<string, string> = {};
+
+      if (req.isMultipart()) {
+        await collectMultipart(req, dir, app.config.maxUploadBytes, files, fields, queryStr(q.format));
+        if (files.length === 0) {
+          throw new AppError(415, 'UNKNOWN_FORMAT', 'Multipart upload contained no `file` field.');
+        }
+      } else {
+        const body = req.body as RawBody | undefined;
+        if (!body || typeof body.tempPath !== 'string') {
+          throw new AppError(415, 'UNKNOWN_FORMAT', 'Send an XML body (application/xml) or a multipart upload.');
+        }
+        const format = detect(body.tempPath, queryStr(q.format) ?? undefined);
+        if (!format) {
+          throw new AppError(415, 'UNKNOWN_FORMAT', 'Could not determine the test-result format. Pass ?format= to override.');
+        }
+        files.push({ tempPath: body.tempPath, fileName: queryStr(q.file_name), fileSize: body.size, format });
       }
 
-      const format = detect(body.tempPath, queryStr(q.format) ?? undefined);
-      if (!format) {
-        throw new AppError(415, 'UNKNOWN_FORMAT', 'Could not determine the test-result format. Pass ?format= to override.');
-      }
-
-      const files: IngestFile[] = [
-        { tempPath: body.tempPath, fileName: queryStr(q.file_name), fileSize: body.size, format },
-      ];
+      const pick = (field: string, query: string) => fields[field] ?? queryStr(q[query]);
       const meta: IngestMeta = {
-        runKey: queryStr(q.run_key),
-        branch: queryStr(q.branch),
-        commitSha: queryStr(q.commit),
-        label: queryStr(q.label),
-        ciUrl: queryStr(q.ci_url),
-        startedAt: queryStr(q.started_at),
+        runKey: pick('run_key', 'run_key'),
+        branch: pick('branch', 'branch'),
+        commitSha: pick('commit', 'commit'),
+        label: pick('label', 'label'),
+        ciUrl: pick('ci_url', 'ci_url'),
+        startedAt: pick('started_at', 'started_at'),
       };
 
       // Ensure the project DB is materialized/migrated, then dispatch.
