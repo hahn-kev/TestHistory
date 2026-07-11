@@ -60,8 +60,12 @@ describe('plugin management + query + serving', () => {
   }
 
   beforeEach(async () => {
-    // Tiny query timeout so the CTE-bomb test is fast.
-    t = await makeApp({ queryTimeoutMs: 500, queryMaxRows: 100, queryMaxBytes: 5 * 1024 * 1024 });
+    // Short-ish query timeout keeps the CTE-bomb test quick, but must stay
+    // generous enough that the *recovery* query after the bomb doesn't race a
+    // cold, just-respawned worker (which pays a tsx-bootstrap cost in tests and
+    // can exceed a very tight budget under CI contention). The bomb is infinite
+    // recursion, so it times out deterministically regardless of this value.
+    t = await makeApp({ queryTimeoutMs: 2_000, queryMaxRows: 100, queryMaxBytes: 5 * 1024 * 1024 });
     admin = await setupAdmin(t.app);
     const pr = await t.app.inject({ method: 'POST', url: '/api/projects', headers: { cookie: admin }, payload: { name: 'Plug' } });
     projectId = pr.json().project.id;
