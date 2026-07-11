@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { Database as Db } from 'better-sqlite3';
 import { AppError } from '../lib/errors.js';
-import { requireProject, type ProjectRow } from '../auth/project-access.js';
+import { computeAccess, requireProject, type ProjectRow } from '../auth/project-access.js';
 import { bearerFrom, resolveToken } from '../auth/tokens.js';
 import { detect } from '../ingest/detect.js';
 import { tmpDir } from '../config.js';
@@ -39,6 +40,36 @@ function uploadAuth(app: FastifyInstance) {
     }
     return sessionMember(req, reply);
   };
+}
+
+/**
+ * Lightweight, read-only pre-authorization run INSIDE the content-type parser
+ * so a caller who clearly has no access is rejected before we stream a body to
+ * a temp file. It mirrors {@link uploadAuth}'s decision but never mutates the
+ * request; `uploadAuth` remains the authoritative preHandler check. Returns an
+ * AppError to reject with, or null to let the parser proceed. It is deliberately
+ * conservative: it only rejects cases uploadAuth would also reject, so it can
+ * never block a legitimate upload.
+ */
+function earlyUploadDenial(core: Db, req: FastifyRequest): AppError | null {
+  const projectId = (req.params as { id: string }).id;
+  const bearer = bearerFrom(req.headers.authorization);
+  const project = core.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as ProjectRow | undefined;
+  if (bearer) {
+    const resolved = resolveToken(core, bearer);
+    if (!resolved || !project || resolved.projectId !== projectId) {
+      return new AppError(401, 'UNAUTHENTICATED', 'Invalid or missing credentials.');
+    }
+    return null;
+  }
+  // No bearer → a session member is required. Hide a project the requester
+  // cannot reach behind a 404, matching requireProject's access model.
+  if (!project) return new AppError(404, 'NOT_FOUND', 'Project not found.');
+  const { level } = computeAccess(core, project, req.user);
+  if (level !== 'member' && level !== 'owner') {
+    return new AppError(404, 'NOT_FOUND', 'Project not found.');
+  }
+  return null;
 }
 
 function queryStr(v: unknown): string | null {
@@ -97,7 +128,12 @@ export async function uploadRoutes(app: FastifyInstance) {
   const dir = tmpDir(app.config.dataDir);
 
   // Raw-body parser: stream application/xml (and text/xml) to a temp file.
+  // Reject an obviously unauthorized request here — parsing runs before the
+  // uploadAuth preHandler, so without this an anonymous caller could stream a
+  // whole body to disk before being turned away. uploadAuth stays authoritative.
   const rawParser = async (req: FastifyRequest, payload: NodeJS.ReadableStream) => {
+    const denial = earlyUploadDenial(app.core, req);
+    if (denial) throw denial;
     const { streamToTempFile } = await import('../lib/stream-to-file.js');
     const result = await streamToTempFile(payload as never, dir, app.config.maxUploadBytes);
     (req.tempFiles ??= []).push(result.tempPath);

@@ -205,6 +205,29 @@ describe('upload route (worker pool + queue)', () => {
     expect(res.statusCode).toBe(404);
   });
 
+  test('anonymous application/xml POST leaves no temp file in DATA_DIR/tmp', async () => {
+    const tmp = path.join(t.dataDir, 'tmp');
+    // Fresh app: nothing has been streamed yet, so the tmp dir does not exist.
+    // (streamToTempFile is what lazily creates it.)
+    expect(fs.existsSync(tmp)).toBe(false);
+
+    const res = await t.app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/runs?format=junit`,
+      headers: { 'content-type': 'application/xml' },
+      payload: '<testsuites><testcase classname="c" name="n"/></testsuites>',
+    });
+    expect(res.statusCode).toBe(404);
+
+    // The content-type parser rejected the request before streaming, so no
+    // temp file was ever written — the tmp dir was never even created. (The
+    // onResponse sweep would remove a leftover file, but here there is nothing
+    // to sweep because nothing was written in the first place.)
+    const leftovers = fs.existsSync(tmp) ? fs.readdirSync(tmp) : [];
+    expect(leftovers).toEqual([]);
+    expect(fs.existsSync(tmp)).toBe(false);
+  });
+
   test('invalid bearer token → 401', async () => {
     const res = await t.app.inject({
       method: 'POST',
