@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TestDefinitions BEFORE Results (reverse order) to prove order-independent join;
+     a result with no matching definition is dropped -->
+<TestRun id="run-2">
+  <TestDefinitions>
+    <UnitTest name="OnlyDef" id="bbbbbbbb-0000-0000-0000-000000000001">
+      <TestMethod className="Ns.Klass, Asm" name="OnlyDef"/>
+    </UnitTest>
+    <UnitTest name="Erroring" id="bbbbbbbb-0000-0000-0000-000000000002">
+      <TestMethod className="Ns.Klass, Asm" name="Erroring"/>
+    </UnitTest>
+  </TestDefinitions>
+  <Results>
+    <UnitTestResult testId="bbbbbbbb-0000-0000-0000-000000000001" testName="OnlyDef" outcome="Passed" duration="00:00:00.1000000"/>
+    <UnitTestResult testId="bbbbbbbb-0000-0000-0000-000000000002" testName="Erroring" outcome="Error" duration="00:00:00.0050000">
+      <Output><ErrorInfo><Message>threw</Message></ErrorInfo></Output>
+    </UnitTestResult>
+    <UnitTestResult testId="ffffffff-no-matching-def" testName="Ghost" outcome="Passed" duration="00:00:00"/>
+  </Results>
+</TestRun>

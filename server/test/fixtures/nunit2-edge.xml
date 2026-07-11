@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- nested fixtures: suite is the nearest TestFixture ancestor; name is last dotted segment -->
+<test-results name="Nested.dll">
+  <test-suite type="Namespace" name="Outer">
+    <results>
+      <test-suite type="TestFixture" name="Outer.Inner.Fixture">
+        <results>
+          <test-case name="Outer.Inner.Fixture.DeeplyNamed" executed="True" result="Success" success="True" time="0.001"/>
+          <test-case name="Outer.Inner.Fixture.NotRun" executed="True" result="Inconclusive" time="0"/>
+        </results>
+      </test-suite>
+    </results>
+  </test-suite>
+</test-results>

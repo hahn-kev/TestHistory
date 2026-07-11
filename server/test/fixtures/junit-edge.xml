@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- single root testsuite, empty classname, duplicate (suite,name) last-wins, failure with no message attr -->
+<testsuite name="root-suite" tests="3">
+  <testcase classname="" name="orphan" time="1.5"/>
+  <testcase classname="pkg.Flaky" name="sometimes" time="0.01">
+    <failure>first outcome failed</failure>
+  </testcase>
+  <testcase classname="pkg.Flaky" name="sometimes" time="0.02"/>
+</testsuite>

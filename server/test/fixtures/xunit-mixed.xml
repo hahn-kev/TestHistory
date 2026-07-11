@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assemblies>
+  <assembly name="MyLib.Tests.dll" total="3" passed="1" failed="1" skipped="1">
+    <collection name="collection-1" total="3">
+      <test name="MyLib.Tests.ParserTests.Parses" type="MyLib.Tests.ParserTests" method="Parses" result="Pass" time="0.0100"/>
+      <test name="MyLib.Tests.ParserTests.Rejects" type="MyLib.Tests.ParserTests" method="Rejects" result="Fail" time="0.0200">
+        <failure exception-type="Xunit.Sdk.EqualException">
+          <message>Assert.Equal() Failure</message>
+          <stack-trace>at ParserTests.Rejects()</stack-trace>
+        </failure>
+      </test>
+      <test name="MyLib.Tests.ParserTests.Later" type="MyLib.Tests.ParserTests" method="Later" result="Skip" time="0">
+        <reason>waiting on upstream</reason>
+      </test>
+    </collection>
+  </assembly>
+</assemblies>

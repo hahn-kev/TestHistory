@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="math" tests="4" failures="1" errors="1" skipped="1">
+    <testcase classname="math.AddTest" name="adds_positive" time="0.012"/>
+    <testcase classname="math.AddTest" name="adds_negative" time="0.003">
+      <failure message="expected 0 but got 1" type="AssertionError">at AddTest.adds_negative (add_test.py:12)</failure>
+    </testcase>
+    <testcase classname="math.DivTest" name="divide_by_zero" time="0.001">
+      <error message="ZeroDivisionError">Traceback... division by zero</error>
+    </testcase>
+    <testcase classname="math.DivTest" name="not_ready" time="0">
+      <skipped message="pending implementation"/>
+    </testcase>
+  </testsuite>
+</testsuites>

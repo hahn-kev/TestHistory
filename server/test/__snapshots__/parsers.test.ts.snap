@@ -1,0 +1,146 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`JUnit > edge: single suite, empty classname, dup last-wins, message from text 1`] = `
+[
+  {
+    "durationMs": 1500,
+    "name": "orphan",
+    "status": "passed",
+    "suite": "",
+  },
+  {
+    "durationMs": 20,
+    "name": "sometimes",
+    "status": "passed",
+    "suite": "pkg.Flaky",
+  },
+]
+`;
+
+exports[`JUnit > mixed statuses 1`] = `
+[
+  {
+    "durationMs": 12,
+    "name": "adds_positive",
+    "status": "passed",
+    "suite": "math.AddTest",
+  },
+  {
+    "durationMs": 3,
+    "message": "expected 0 but got 1",
+    "name": "adds_negative",
+    "stack": "at AddTest.adds_negative (add_test.py:12)",
+    "status": "failed",
+    "suite": "math.AddTest",
+  },
+  {
+    "durationMs": 1,
+    "message": "ZeroDivisionError",
+    "name": "divide_by_zero",
+    "stack": "Traceback... division by zero",
+    "status": "error",
+    "suite": "math.DivTest",
+  },
+  {
+    "durationMs": 0,
+    "message": "pending implementation",
+    "name": "not_ready",
+    "status": "skipped",
+    "suite": "math.DivTest",
+  },
+]
+`;
+
+exports[`NUnit2 > mixed statuses, fixture ancestry, last name segment 1`] = `
+[
+  {
+    "durationMs": 10,
+    "name": "Adds",
+    "status": "passed",
+    "suite": "Suite.CalculatorTests",
+  },
+  {
+    "durationMs": 20,
+    "message": "Expected 2 but was 3",
+    "name": "Subtracts",
+    "stack": "at CalculatorTests.Subtracts()",
+    "status": "failed",
+    "suite": "Suite.CalculatorTests",
+  },
+  {
+    "durationMs": 5,
+    "message": "System.DivideByZeroException",
+    "name": "Divides",
+    "stack": "at CalculatorTests.Divides()",
+    "status": "error",
+    "suite": "Suite.CalculatorTests",
+  },
+  {
+    "durationMs": undefined,
+    "message": "not implemented",
+    "name": "Ignored",
+    "status": "skipped",
+    "suite": "Suite.CalculatorTests",
+  },
+]
+`;
+
+exports[`NUnit3 > mixed: label=Error promotes to error 1`] = `
+[
+  {
+    "durationMs": 1.234,
+    "name": "Concatenates",
+    "status": "passed",
+    "suite": "Suite.StringTests",
+  },
+  {
+    "durationMs": 4,
+    "message": "Expected 3 items but got 2",
+    "name": "Splits",
+    "stack": "at StringTests.Splits()",
+    "status": "failed",
+    "suite": "Suite.StringTests",
+  },
+  {
+    "durationMs": 2,
+    "message": "System.NullReferenceException",
+    "name": "Throws",
+    "stack": "at StringTests.Throws()",
+    "status": "error",
+    "suite": "Suite.StringTests",
+  },
+  {
+    "durationMs": 0,
+    "message": "ignored",
+    "name": "Pending",
+    "status": "skipped",
+    "suite": "Suite.StringTests",
+  },
+]
+`;
+
+exports[`xUnit > mixed statuses + skip reason 1`] = `
+[
+  {
+    "durationMs": 10,
+    "name": "Parses",
+    "status": "passed",
+    "suite": "MyLib.Tests.ParserTests",
+  },
+  {
+    "durationMs": 20,
+    "message": "Assert.Equal() Failure",
+    "name": "Rejects",
+    "stack": "at ParserTests.Rejects()",
+    "status": "failed",
+    "suite": "MyLib.Tests.ParserTests",
+  },
+  {
+    "durationMs": 0,
+    "message": "waiting on upstream",
+    "name": "Later",
+    "status": "skipped",
+    "suite": "MyLib.Tests.ParserTests",
+  },
+]
+`;

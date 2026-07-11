@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- inconclusive → skipped; missing classname → empty suite; CDATA message -->
+<test-run id="3">
+  <test-suite type="Assembly" name="Edge.dll">
+    <test-case id="2001" name="NoClass" result="Passed" duration="0.5"/>
+    <test-case id="2002" name="Inconclusive" classname="Edge.Fixture" result="Inconclusive" duration="0"/>
+    <test-case id="2003" name="WithCdata" classname="Edge.Fixture" result="Failed" duration="0.01">
+      <failure>
+        <message><![CDATA[boom < & > happened]]></message>
+      </failure>
+    </test-case>
+  </test-suite>
+</test-run>

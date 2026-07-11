@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- single <assembly> root (no <assemblies> wrapper); duplicate (type,method) last-wins -->
+<assembly name="Edge.dll" total="2">
+  <collection name="c">
+    <test name="Edge.Fixture.Repeated" type="Edge.Fixture" method="Repeated" result="Fail" time="0.01">
+      <failure><message>first</message></failure>
+    </test>
+    <test name="Edge.Fixture.Repeated" type="Edge.Fixture" method="Repeated" result="Pass" time="0.02"/>
+  </collection>
+</assembly>

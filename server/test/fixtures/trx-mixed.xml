@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestRun id="run-1" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Results>
+    <UnitTestResult testId="aaaaaaaa-0000-0000-0000-000000000001" testName="Passes" outcome="Passed" duration="00:00:00.0120000"/>
+    <UnitTestResult testId="aaaaaaaa-0000-0000-0000-000000000002" testName="Breaks" outcome="Failed" duration="00:00:01.5000000">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.AreEqual failed</Message>
+          <StackTrace>at Fixture.Breaks()</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult testId="aaaaaaaa-0000-0000-0000-000000000003" testName="Skips" outcome="NotExecuted" duration="00:00:00.0000000"/>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Passes" id="aaaaaaaa-0000-0000-0000-000000000001">
+      <TestMethod className="MyApp.Tests.Fixture, MyApp.Tests, Version=1.0.0.0" name="Passes"/>
+    </UnitTest>
+    <UnitTest name="Breaks" id="aaaaaaaa-0000-0000-0000-000000000002">
+      <TestMethod className="MyApp.Tests.Fixture, MyApp.Tests" name="Breaks"/>
+    </UnitTest>
+    <UnitTest name="Skips" id="aaaaaaaa-0000-0000-0000-000000000003">
+      <TestMethod className="MyApp.Tests.Fixture, MyApp.Tests" name="Skips"/>
+    </UnitTest>
+  </TestDefinitions>
+</TestRun>
