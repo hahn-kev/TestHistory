@@ -1,1 +1,91 @@
 @import 'tailwindcss';
+
+/* Map Tailwind utility colors to runtime CSS variables so switching
+   `[data-theme]` re-themes the whole app without rebuilding. */
+@theme inline {
+  --color-bg: var(--th-bg);
+  --color-surface: var(--th-surface);
+  --color-surface-2: var(--th-surface-2);
+  --color-fg: var(--th-fg);
+  --color-muted: var(--th-muted);
+  --color-border: var(--th-border);
+  --color-primary: var(--th-primary);
+  --color-primary-fg: var(--th-primary-fg);
+  --color-pass: var(--th-pass);
+  --color-fail: var(--th-fail);
+  --color-error: var(--th-error);
+  --color-skip: var(--th-skip);
+}
+
+/* --- Theme sets --- */
+:root,
+[data-theme='light'] {
+  --th-bg: #f6f7f9;
+  --th-surface: #ffffff;
+  --th-surface-2: #f0f2f5;
+  --th-fg: #1a1d21;
+  --th-muted: #667085;
+  --th-border: #e3e6ea;
+  --th-primary: #2563eb;
+  --th-primary-fg: #ffffff;
+  --th-pass: #16a34a;
+  --th-fail: #dc2626;
+  --th-error: #ea580c;
+  --th-skip: #94a3b8;
+}
+
+[data-theme='dark'] {
+  --th-bg: #0f1115;
+  --th-surface: #171a21;
+  --th-surface-2: #1f232c;
+  --th-fg: #e6e9ef;
+  --th-muted: #99a2b2;
+  --th-border: #2a2f3a;
+  --th-primary: #3b82f6;
+  --th-primary-fg: #ffffff;
+  --th-pass: #22c55e;
+  --th-fail: #ef4444;
+  --th-error: #fb923c;
+  --th-skip: #64748b;
+}
+
+[data-theme='dark-violet'] {
+  --th-bg: #14121c;
+  --th-surface: #1c1826;
+  --th-surface-2: #251f33;
+  --th-fg: #ece7f5;
+  --th-muted: #a99fc0;
+  --th-border: #332b45;
+  --th-primary: #8b5cf6;
+  --th-primary-fg: #ffffff;
+  --th-pass: #34d399;
+  --th-fail: #f472b6;
+  --th-error: #fbbf24;
+  --th-skip: #6b7280;
+}
+
+[data-theme='light-emerald'] {
+  --th-bg: #f2f7f4;
+  --th-surface: #ffffff;
+  --th-surface-2: #e8f1ec;
+  --th-fg: #142019;
+  --th-muted: #5c7267;
+  --th-border: #d5e5dc;
+  --th-primary: #059669;
+  --th-primary-fg: #ffffff;
+  --th-pass: #059669;
+  --th-fail: #dc2626;
+  --th-error: #d97706;
+  --th-skip: #9ca3af;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  background: var(--th-bg);
+  color: var(--th-fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
