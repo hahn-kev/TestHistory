@@ -121,6 +121,16 @@ export interface TrendPoint {
   durationMs: number | null;
 }
 
+export interface NameRule {
+  match: string;
+  rewrite: string;
+}
+
+export interface NameRulePreviewSample {
+  before: { suite: string; name: string };
+  after: { suite: string; name: string };
+}
+
 export interface PluginInfo {
   id: string;
   name: string;
