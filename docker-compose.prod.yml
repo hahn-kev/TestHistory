@@ -1,0 +1,18 @@
+# Production override: run the image published to GHCR instead of building
+# locally. Layer it on top of the base compose file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Pin a specific build with IMAGE_TAG (defaults to latest), e.g.
+#   IMAGE_TAG=sha-52c49dc docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+services:
+  testhistory:
+    image: ghcr.io/hahn-kev/testhistory:${IMAGE_TAG:-latest}
+    # Always fetch the referenced tag on `up` so a moved `latest` is picked up.
+    pull_policy: always
+    environment:
+      # In production, set this so sessions and signed plugin URLs survive a
+      # redeploy that loses the /data volume. Generate once, keep it secret:
+      #   openssl rand -hex 32
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in the environment or a .env file}

@@ -17,6 +17,23 @@ docker compose up --build -d
 The container stores everything under the `/data` volume:
 `/data/core.db`, `/data/projects/{id}.db`, `/data/plugins/{id}.html`, `/data/tmp/`.
 
+### Production (run the published image)
+
+CI publishes the image to `ghcr.io/hahn-kev/testhistory` on every push to `master`
+(tag `latest`, plus `sha-<commit>`). On your server, layer `docker-compose.prod.yml`
+over the base file to pull that image instead of building locally:
+
+```bash
+export SESSION_SECRET=$(openssl rand -hex 32)   # keep this stable across redeploys
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+Pin a specific build with `IMAGE_TAG` (e.g. `IMAGE_TAG=sha-52c49dc`). If the GHCR
+package is private, run `docker login ghcr.io -u <user>` with a PAT that has
+`read:packages` first. To upgrade, re-run the two commands above — `pull_policy: always`
+fetches the current tag.
+
 ### Uploading results from CI
 
 Create a project, mint an API token under **Settings → Tokens**, then:
