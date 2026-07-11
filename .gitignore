@@ -6,3 +6,6 @@ data/
 *.db-shm
 .env
 coverage/
+
+# Stray file podman-on-Windows ssh can create (reserved device name)
+NUL
