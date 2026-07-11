@@ -1,5 +1,4 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import multipart from '@fastify/multipart';
 import { AppError } from '../lib/errors.js';
 import { requireProject, type ProjectRow } from '../auth/project-access.js';
 import { bearerFrom, resolveToken } from '../auth/tokens.js';
@@ -96,8 +95,6 @@ function mapIngestError(e: unknown): AppError {
 
 export async function uploadRoutes(app: FastifyInstance) {
   const dir = tmpDir(app.config.dataDir);
-
-  await app.register(multipart, { limits: { fileSize: app.config.maxUploadBytes } });
 
   // Raw-body parser: stream application/xml (and text/xml) to a temp file.
   const rawParser = async (req: FastifyRequest, payload: NodeJS.ReadableStream) => {

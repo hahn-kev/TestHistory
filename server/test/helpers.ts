@@ -20,7 +20,13 @@ export async function makeApp(overrides: Partial<AppConfig> = {}): Promise<TestA
     dataDir,
     close: async () => {
       await app.close();
-      fs.rmSync(dataDir, { recursive: true, force: true });
+      // On Windows a worker terminated mid-query can briefly hold a DB file
+      // handle (released at process exit); tolerate the transient EBUSY.
+      try {
+        fs.rmSync(dataDir, { recursive: true, force: true });
+      } catch {
+        /* leave the OS to reclaim the temp dir */
+      }
     },
   };
 }

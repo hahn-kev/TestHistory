@@ -39,12 +39,17 @@ export class WorkerPool {
     size: number,
     private readonly workerData?: unknown,
   ) {
-    for (let i = 0; i < size; i++) this.slots.push(this.spawn());
+    for (let i = 0; i < size; i++) {
+      const slot: Slot = { worker: null as unknown as Worker, current: null, timer: null };
+      this.spawnInto(slot);
+      this.slots.push(slot);
+    }
   }
 
-  private spawn(): Slot {
+  /** (Re)create the worker for a persistent slot; handlers close over that slot. */
+  private spawnInto(slot: Slot): void {
     const worker = new Worker(this.workerUrl, { execArgv: this.execArgv, workerData: this.workerData });
-    const slot: Slot = { worker, current: null, timer: null };
+    slot.worker = worker;
     worker.on('message', (msg: { id: number; ok: boolean; result?: unknown; error?: WorkerError }) => {
       const task = slot.current;
       if (!task || task.id !== msg.id) return;
@@ -58,7 +63,8 @@ export class WorkerPool {
       this.pump();
     });
     worker.on('error', (err) => {
-      // Unexpected crash: fail the in-flight task and replace the worker.
+      // Ignore errors from a worker we've already detached (post-terminate).
+      if (slot.worker !== worker) return;
       const task = slot.current;
       this.finish(slot);
       this.replace(slot);
@@ -69,7 +75,6 @@ export class WorkerPool {
       }
       this.pump();
     });
-    return slot;
   }
 
   private finish(slot: Slot) {
@@ -81,16 +86,16 @@ export class WorkerPool {
   }
 
   private replace(slot: Slot) {
-    try {
-      void slot.worker.terminate();
-    } catch {
-      /* ignore */
-    }
-    if (this.destroyed) return;
-    const fresh = this.spawn();
-    slot.worker = fresh.worker;
+    const dead = slot.worker;
+    // Detach first so the terminated worker's error/exit events are ignored.
     slot.current = null;
     slot.timer = null;
+    if (this.destroyed) {
+      void dead?.terminate().catch(() => {});
+      return;
+    }
+    this.spawnInto(slot); // reassigns slot.worker to a fresh worker
+    void dead?.terminate().catch(() => {});
   }
 
   /** Run a task; rejects with a `TIMEOUT`-coded error if it exceeds `timeoutMs`. */

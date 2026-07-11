@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
+import multipart from '@fastify/multipart';
 import type { Database as Db } from 'better-sqlite3';
 import type { AppConfig } from './config.js';
 import { openCoreDb } from './db/core-db.js';
@@ -14,7 +15,9 @@ import { tokenRoutes } from './routes/tokens.js';
 import { uploadRoutes } from './routes/uploads.js';
 import { readRoutes } from './routes/reads.js';
 import { nameRuleRoutes } from './routes/name-rules.js';
+import { pluginRoutes } from './routes/plugins.js';
 import { IngestService, sweepTmpDir } from './ingest/queue.js';
+import { QueryService } from './query/pool.js';
 import { registerErrorHandler } from './lib/errors.js';
 import { tmpDir } from './config.js';
 
@@ -24,6 +27,7 @@ declare module 'fastify' {
     core: Db;
     dbManager: DbManager;
     ingest: IngestService;
+    query: QueryService;
   }
 }
 
@@ -50,10 +54,16 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
   const ingestService = new IngestService(2, config.ingestTimeoutMs);
   app.decorate('ingest', ingestService);
 
+  const queryService = new QueryService(config.queryTimeoutMs);
+  app.decorate('query', queryService);
+
   registerErrorHandler(app);
 
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
+  await app.register(multipart, {
+    limits: { fileSize: Math.max(config.maxUploadBytes, config.maxPluginBytes) },
+  });
 
   // Resolve the session cookie into `request.user` for every request.
   app.decorateRequest('user', null);
@@ -72,6 +82,7 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
   await app.register(uploadRoutes);
   await app.register(readRoutes);
   await app.register(nameRuleRoutes);
+  await app.register(pluginRoutes);
 
   // Daily expired-session sweep (unref'd so it never holds the process open).
   const sweepTimer = setInterval(() => {
@@ -86,6 +97,7 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
   app.addHook('onClose', async () => {
     clearInterval(sweepTimer);
     await ingestService.destroy();
+    await queryService.destroy();
     dbManager.closeAll();
     core.close();
   });
