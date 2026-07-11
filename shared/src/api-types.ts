@@ -22,6 +22,7 @@ export interface ProjectInfo {
   id: string;
   name: string;
   description: string | null;
+  private: boolean;
   createdAt: string;
   myRole: ProjectRole | null;
   lastRun?: RunSummary | null;

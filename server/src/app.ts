@@ -4,14 +4,19 @@ import rateLimit from '@fastify/rate-limit';
 import type { Database as Db } from 'better-sqlite3';
 import type { AppConfig } from './config.js';
 import { openCoreDb } from './db/core-db.js';
+import { DbManager } from './db/project-db.js';
 import { SESSION_COOKIE, resolveSession, sweepExpiredSessions } from './auth/sessions.js';
 import { authRoutes } from './routes/auth.js';
 import { adminUserRoutes } from './routes/admin-users.js';
+import { projectRoutes } from './routes/projects.js';
+import { memberRoutes } from './routes/members.js';
+import { tokenRoutes } from './routes/tokens.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
     config: AppConfig;
     core: Db;
+    dbManager: DbManager;
   }
 }
 
@@ -29,6 +34,10 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
   const core = openCoreDb(config.dataDir);
   app.decorate('core', core);
 
+  const dbManager = new DbManager(config.dataDir);
+  dbManager.migrateAll();
+  app.decorate('dbManager', dbManager);
+
   await app.register(cookie);
   await app.register(rateLimit, { global: false });
 
@@ -43,6 +52,9 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
 
   await app.register(authRoutes);
   await app.register(adminUserRoutes);
+  await app.register(projectRoutes);
+  await app.register(memberRoutes);
+  await app.register(tokenRoutes);
 
   // Daily expired-session sweep (unref'd so it never holds the process open).
   const sweepTimer = setInterval(() => {
@@ -56,6 +68,7 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
 
   app.addHook('onClose', async () => {
     clearInterval(sweepTimer);
+    dbManager.closeAll();
     core.close();
   });
 
