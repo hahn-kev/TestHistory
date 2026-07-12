@@ -1,0 +1,88 @@
+name: 'Upload Test Results to TestHistory'
+description: 'Upload JUnit, NUnit, xUnit, or TRX test results to your self-hosted TestHistory instance.'
+branding:
+  icon: 'upload-cloud'
+  color: 'blue'
+
+inputs:
+  server-url:
+    description: 'The URL of the TestHistory service (e.g. https://testhistory.company.com or http://localhost:3000)'
+    required: true
+  project-id:
+    description: 'The target TestHistory Project ID.'
+    required: true
+  api-token:
+    description: 'The Bearer API token for authentication.'
+    required: true
+  files:
+    description: 'The glob pattern(s) to match test result files (multiline supported).'
+    required: true
+  on-no-files:
+    description: 'Behavior when no files match the glob patterns (error or ignore).'
+    required: false
+    default: 'error'
+  run-key:
+    description: 'The unique run key.'
+    required: false
+    default: '${{ github.run_id }}-${{ github.run_attempt }}'
+  branch:
+    description: 'The VCS branch name.'
+    required: false
+    default: '${{ github.ref_name }}'
+  commit:
+    description: 'The commit SHA.'
+    required: false
+    default: '${{ github.sha }}'
+  format:
+    description: 'Format override (e.g. junit, nunit2, nunit3, xunit, trx).'
+    required: false
+  label:
+    description: 'A custom label for this run.'
+    required: false
+  ci-url:
+    description: 'Link back to the CI pipeline.'
+    required: false
+    default: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+  started-at:
+    description: 'ISO timestamp for when the run started (defaults to current UTC time if not provided).'
+    required: false
+
+outputs:
+  run-id:
+    description: 'The ID of the created or appended run.'
+    value: ${{ steps.upload.outputs.run-id }}
+  total:
+    description: 'Total number of tests in the run.'
+    value: ${{ steps.upload.outputs.total }}
+  passed:
+    description: 'Number of passing tests.'
+    value: ${{ steps.upload.outputs.passed }}
+  failed:
+    description: 'Number of failing tests.'
+    value: ${{ steps.upload.outputs.failed }}
+  errored:
+    description: 'Number of errored tests.'
+    value: ${{ steps.upload.outputs.errored }}
+  skipped:
+    description: 'Number of skipped tests.'
+    value: ${{ steps.upload.outputs.skipped }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: upload
+      shell: bash
+      env:
+        INPUT_SERVER_URL: ${{ inputs.server-url }}
+        INPUT_PROJECT_ID: ${{ inputs.project-id }}
+        INPUT_API_TOKEN: ${{ inputs.api-token }}
+        INPUT_FILES: ${{ inputs.files }}
+        INPUT_ON_NO_FILES: ${{ inputs.on-no-files }}
+        INPUT_RUN_KEY: ${{ inputs.run-key }}
+        INPUT_BRANCH: ${{ inputs.branch }}
+        INPUT_COMMIT: ${{ inputs.commit }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_LABEL: ${{ inputs.label }}
+        INPUT_CI_URL: ${{ inputs.ci-url }}
+        INPUT_STARTED_AT: ${{ inputs.started-at }}
+      run: python3 "${{ github.action_path }}/upload.py"
