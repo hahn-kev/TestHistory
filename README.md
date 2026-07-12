@@ -62,6 +62,53 @@ retried upload never double-counts. After the window closes the run is immutable
 reused key returns **409 `RUN_KEY_EXPIRED`** — so a run key must be **fresh per build**
 (use a CI build id, not a bare commit SHA).
 
+### Reusable GitHub Action
+
+For GitHub CI, we provide a reusable composite GitHub Action to easily find and upload your test results. It supports multiple glob patterns (e.g., recursive search), handles run key/re-run conventions cleanly, and exposes run summary counters as outputs.
+
+To use it, add a step like this in your workflow:
+
+```yaml
+- name: Upload Test Results
+  uses: hahn-kev/testhistory/.github/actions/upload-results@latest # Or pin a specific branch/commit SHA
+  with:
+    server-url: 'https://testhistory.company.com'
+    project-id: 'your-project-id'
+    api-token: ${{ secrets.TESTHISTORY_TOKEN }}
+    files: |
+      **/test-results/**/*.xml
+      **/junit-*.xml
+    on-no-files: 'error' # Options: error | ignore (defaults to error)
+```
+
+#### Inputs
+
+| Input | Description | Required / Default |
+| --- | --- | --- |
+| `server-url` | The URL of your TestHistory instance. | **Required** |
+| `project-id` | Target project ID. | **Required** |
+| `api-token` | Your API token from project Settings → Tokens. | **Required** |
+| `files` | Multiline glob pattern(s) to match test result files. | **Required** |
+| `on-no-files` | Behavior when no files match the patterns (`error` or `ignore`). | `error` |
+| `run-key` | Unique key identifying this build run. | `${{ github.run_id }}-${{ github.run_attempt }}` |
+| `branch` | The VCS branch name. | `${{ github.ref_name }}` |
+| `commit` | The commit SHA. | `${{ github.sha }}` |
+| `format` | Override parser format (e.g., `junit`, `nunit3`, `xunit`, `trx`). | Auto-detected |
+| `label` | A custom label for this run. | (None) |
+| `ci-url` | Link back to the CI run. | `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}` |
+| `started-at` | ISO 8601 timestamp for the run start. | (Current UTC time) |
+
+#### Outputs
+
+| Output | Description |
+| --- | --- |
+| `run-id` | The ID of the created or appended run. |
+| `total` | Total number of tests in the run. |
+| `passed` | Number of passing tests. |
+| `failed` | Number of failing tests. |
+| `errored` | Number of errored tests. |
+| `skipped` | Number of skipped tests. |
+
 ## Development
 
 ```bash
