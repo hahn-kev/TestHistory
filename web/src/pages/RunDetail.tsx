@@ -25,11 +25,19 @@ export function RunDetailPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <Link to={`/projects/${id}`} className="text-sm text-muted hover:text-fg">
-          ← Back to project
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <Link to={`/projects/${id}`} className="text-sm text-muted hover:text-fg">
+            ← Back to project
+          </Link>
+          <h1 className="mt-1 text-2xl font-semibold text-fg">Run #{r.id}</h1>
+        </div>
+        <Link
+          to={`/projects/${id}/compare?head=${r.id}`}
+          className="rounded-md border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-surface-2"
+        >
+          Compare…
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold text-fg">Run #{r.id}</h1>
       </div>
 
       <Card className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">

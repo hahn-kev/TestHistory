@@ -28,6 +28,9 @@ export function ProjectNav({ project }: { project: ProjectInfo }) {
         <NavLink to={`${base}/flaky`} className={({ isActive }) => `${tab} ${isActive ? active : idle}`}>
           Flaky
         </NavLink>
+        <NavLink to={`${base}/compare`} className={({ isActive }) => `${tab} ${isActive ? active : idle}`}>
+          Compare
+        </NavLink>
         {canManage && (
           <NavLink
             to={`${base}/settings`}

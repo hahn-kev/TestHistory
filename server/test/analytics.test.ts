@@ -9,8 +9,11 @@ import {
   getTestHistory,
   recomputeRunCounters,
   resolveAppendTarget,
+  compareRuns,
+  resolveRunRef,
 } from '../src/analytics/analytics.js';
-import type { TestStatus } from '@testhistory/shared';
+import { formatComparisonMarkdown, COMPARE_MARKER } from '../src/analytics/compare-format.js';
+import type { TestStatus, RunSummary } from '@testhistory/shared';
 
 const CODE: Record<TestStatus, number> = { passed: 0, failed: 1, error: 2, skipped: 3 };
 
@@ -233,5 +236,168 @@ describe('computeTrend + getTestHistory', () => {
       [2, 'failed'],
       [1, 'passed'],
     ]);
+  });
+});
+
+describe('resolveRunRef', () => {
+  beforeEach(() => {
+    addRun(1, { branch: 'main' });
+    addRun(2, { branch: 'pr' });
+    addRun(3, { branch: 'main' });
+  });
+
+  test('explicit run id that exists resolves', () => {
+    expect(resolveRunRef(db, { runId: 2 })).toEqual({ ok: true, runId: 2 });
+  });
+
+  test('unknown run id → run_not_found', () => {
+    expect(resolveRunRef(db, { runId: 999 })).toEqual({ ok: false, reason: 'run_not_found' });
+  });
+
+  test('branch resolves to the latest run on that branch', () => {
+    expect(resolveRunRef(db, { branch: 'main' })).toEqual({ ok: true, runId: 3 });
+  });
+
+  test('branch with no runs → branch_empty', () => {
+    expect(resolveRunRef(db, { branch: 'nope' })).toEqual({ ok: false, reason: 'branch_empty', branch: 'nope' });
+  });
+
+  test('neither id nor branch → missing_input', () => {
+    expect(resolveRunRef(db, {})).toEqual({ ok: false, reason: 'missing_input' });
+  });
+
+  test('run id takes precedence over branch', () => {
+    expect(resolveRunRef(db, { runId: 1, branch: 'pr' })).toEqual({ ok: true, runId: 1 });
+  });
+});
+
+describe('compareRuns — classification matrix', () => {
+  // Seed one test id per transition across base run 1 and head run 2.
+  // `undefined` in either slot means "absent" (no result row uploaded).
+  function seedTransition(testId: number, base: TestStatus | undefined, head: TestStatus | undefined) {
+    ensureTest(testId, 'suite', `t${testId}`, 1);
+    if (base !== undefined) addResult(testId, 1, base);
+    if (head !== undefined) addResult(testId, 2, head);
+  }
+
+  beforeEach(() => {
+    addRun(1);
+    addRun(2);
+  });
+
+  test('every transition lands in the expected category', () => {
+    const cases: Array<[TestStatus | undefined, TestStatus | undefined, string | null]> = [
+      ['passed', 'failed', 'newlyFailing'],
+      ['passed', 'error', 'newlyFailing'],
+      ['skipped', 'failed', 'newlyFailing'],
+      [undefined, 'failed', 'newlyFailing'], // brand-new failing test → newlyFailing, not newTests
+      ['failed', 'passed', 'newlyFixed'],
+      ['error', 'passed', 'newlyFixed'],
+      ['failed', 'failed', 'stillFailing'],
+      ['error', 'error', 'stillFailing'],
+      ['failed', 'error', 'stillFailing'],
+      [undefined, 'passed', 'newTests'],
+      [undefined, 'skipped', 'newTests'],
+      ['passed', undefined, 'removedTests'],
+      ['failed', undefined, 'removedTests'],
+      // neutral / "other" (not returned in any detail bucket)
+      ['passed', 'passed', null],
+      ['passed', 'skipped', null],
+      ['skipped', 'passed', null],
+      ['failed', 'skipped', null], // skipping is not fixing
+      ['skipped', 'skipped', null],
+    ];
+    cases.forEach(([base, head], i) => seedTransition(i + 1, base, head));
+
+    const { summary, categories } = compareRuns(db, 1, 2);
+    const idsIn = (cat: keyof typeof categories) => categories[cat].tests.map((t) => t.testId).sort((a, b) => a - b);
+
+    expect(idsIn('newlyFailing')).toEqual([1, 2, 3, 4]);
+    expect(idsIn('newlyFixed')).toEqual([5, 6]);
+    expect(idsIn('stillFailing')).toEqual([7, 8, 9]);
+    expect(idsIn('newTests')).toEqual([10, 11]);
+    expect(idsIn('removedTests')).toEqual([12, 13]);
+    expect(summary.other).toBe(5);
+    expect(summary.regressions).toBe(4);
+    expect(summary.fixed).toBe(2);
+  });
+
+  test('absent status is surfaced on the compared test row', () => {
+    seedTransition(1, undefined, 'failed');
+    seedTransition(2, 'passed', undefined);
+    const { categories } = compareRuns(db, 1, 2);
+    expect(categories.newlyFailing.tests[0]).toMatchObject({ baseStatus: 'absent', headStatus: 'failed' });
+    expect(categories.removedTests.tests[0]).toMatchObject({ baseStatus: 'passed', headStatus: 'absent' });
+  });
+
+  test('base == head → no changes; still-failing reflects that run', () => {
+    seedTransition(1, 'passed', 'passed');
+    seedTransition(2, 'failed', 'failed');
+    const { summary } = compareRuns(db, 1, 1);
+    expect(summary).toMatchObject({ regressions: 0, fixed: 0, newTests: 0, removedTests: 0, stillFailing: 1 });
+    expect(summary.totalDelta).toBe(0);
+    expect(summary.durationDeltaMs).toBeNull(); // seeded runs have no duration → delta unknown
+  });
+
+  test('summary deltas come from the run counters', () => {
+    seedTransition(1, 'passed', 'failed');
+    seedTransition(2, 'passed', 'passed');
+    recomputeRunCounters(db, 1);
+    recomputeRunCounters(db, 2);
+    const { summary } = compareRuns(db, 1, 2);
+    expect(summary.passedDelta).toBe(-1); // 2 passed → 1 passed
+    expect(summary.failedDelta).toBe(1);
+    expect(summary.totalDelta).toBe(0);
+  });
+
+  test('detail lists are capped at limit; totals stay exact', () => {
+    for (let i = 1; i <= 5; i++) seedTransition(i, 'passed', 'failed');
+    const { summary, categories } = compareRuns(db, 1, 2, { limit: 2 });
+    expect(summary.regressions).toBe(5); // exact
+    expect(categories.newlyFailing.tests).toHaveLength(2); // capped
+    expect(categories.newlyFailing.truncated).toBe(true);
+  });
+});
+
+describe('formatComparisonMarkdown', () => {
+  function comparison(overrides: Partial<RunSummary> = {}): Parameters<typeof formatComparisonMarkdown>[0] {
+    const base: RunSummary = {
+      id: 1, createdAt: '2026-01-01T00:00:00Z', startedAt: null, durationMs: 1000,
+      label: null, branch: 'main', commitSha: 'abcdef1234', ciUrl: null, uploads: [],
+      total: 3, passed: 3, failed: 0, errored: 0, skipped: 0,
+    };
+    const head: RunSummary = { ...base, id: 2, branch: 'pr', durationMs: 1500, passed: 2, failed: 1, ...overrides };
+    return {
+      base, head,
+      summary: {
+        regressions: 1, fixed: 0, stillFailing: 0, newTests: 0, removedTests: 0, other: 2,
+        passedDelta: -1, failedDelta: 1, erroredDelta: 0, skippedDelta: 0, totalDelta: 0, durationDeltaMs: 500,
+      },
+      categories: {
+        newlyFailing: { total: 1, truncated: false, tests: [{ testId: 1, suite: 'suite', name: 'the_test', baseStatus: 'passed', headStatus: 'failed', baseDurationMs: 1, headDurationMs: 1 }] },
+        newlyFixed: { total: 0, truncated: false, tests: [] },
+        stillFailing: { total: 0, truncated: false, tests: [] },
+        newTests: { total: 0, truncated: false, tests: [] },
+        removedTests: { total: 0, truncated: false, tests: [] },
+      },
+    };
+  }
+
+  test('includes the regression count, the failing test, and the marker', () => {
+    const md = formatComparisonMarkdown(comparison());
+    expect(md).toContain('1 newly failing');
+    expect(md).toContain('suite › the_test');
+    expect(md).toContain('#1');
+    expect(md).toContain('#2');
+    expect(md).toContain(COMPARE_MARKER);
+  });
+
+  test('no regressions → green verdict, no Newly failing section', () => {
+    const c = comparison();
+    c.summary.regressions = 0;
+    c.categories.newlyFailing = { total: 0, truncated: false, tests: [] };
+    const md = formatComparisonMarkdown(c);
+    expect(md).toContain('no new failures');
+    expect(md).not.toContain('#### Newly failing');
   });
 });
