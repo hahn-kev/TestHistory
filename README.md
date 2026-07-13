@@ -109,6 +109,27 @@ To use it, add a step like this in your workflow:
 | `errored` | Number of errored tests. |
 | `skipped` | Number of skipped tests. |
 
+## Comparing runs
+
+The **Compare** tab (and `GET /api/projects/<id>/compare`) diffs two runs and reports what
+changed: **newly failing** (regressions), **newly fixed**, **still failing**, **new
+tests**, and **removed tests**, plus per-status and duration deltas. Each side is named by
+run id **or** by the latest run on a branch — so you can compare a PR's run against the
+latest `main` run without knowing main's run id:
+
+```
+GET /api/projects/<id>/compare?baseBranch=main&head=<runId>            → JSON
+GET /api/projects/<id>/compare?baseBranch=main&head=<runId>&format=md  → Markdown
+```
+
+`?format=md` (or `Accept: text/markdown`) returns a compact summary suitable for pasting
+into a PR comment; it ends with a stable `<!-- testhistory-compare -->` marker so a bot can
+find and update its own comment in place. Like all read endpoints, `/compare` is authorized
+by **viewer** access (a signed-in session; project tokens are for uploads only). Errors:
+**400** if a side names neither a run id nor a branch; **404** for an unknown run id or a
+branch with no runs. A brand-new test that fails counts as *newly failing* (a merge-gating
+signal), and `fail → skip` is treated as unchanged, not fixed.
+
 ## Development
 
 ```bash

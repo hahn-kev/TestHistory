@@ -1,9 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import type { Database as Db } from 'better-sqlite3';
-import type { RunSummary, UploadInfo, TestResultRow, TestInfo, TestStatus } from '@testhistory/shared';
+import type { RunSummary, UploadInfo, TestResultRow, TestInfo, TestStatus, RunComparison } from '@testhistory/shared';
 import { requireProject } from '../auth/project-access.js';
 import { sendError } from '../auth/guards.js';
-import { detectFlaky, computeTrend, getTestHistory } from '../analytics/analytics.js';
+import {
+  detectFlaky,
+  computeTrend,
+  getTestHistory,
+  compareRuns,
+  resolveRunRef,
+  type RunRefResolution,
+} from '../analytics/analytics.js';
+import { formatComparisonMarkdown } from '../analytics/compare-format.js';
 import { STATUS_NAME, STATUS_CODE } from '../ingest/model.js';
 
 interface RunRow {
@@ -55,6 +63,17 @@ function numOrNull(v: unknown): number | null {
 
 function str(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 ? v : null;
+}
+
+/** Map a failed run-reference resolution to an HTTP error (`side` is "Base"/"Head"). */
+function refError(reply: import('fastify').FastifyReply, res: RunRefResolution & { ok: false }, side: string) {
+  if (res.reason === 'missing_input') {
+    return sendError(reply, 400, 'BAD_REQUEST', `Provide ${side.toLowerCase()} as a run id or branch.`);
+  }
+  if (res.reason === 'branch_empty') {
+    return sendError(reply, 404, 'NOT_FOUND', `No runs on branch '${res.branch}'.`);
+  }
+  return sendError(reply, 404, 'NOT_FOUND', `${side} run not found.`);
 }
 
 export async function readRoutes(app: FastifyInstance) {
@@ -170,6 +189,34 @@ export async function readRoutes(app: FastifyInstance) {
       .get(testId) as TestInfo | undefined;
     if (!test) return sendError(reply, 404, 'NOT_FOUND', 'Test not found.');
     return { test, history: getTestHistory(d, testId) };
+  });
+
+  // --- Compare two runs (base vs head) ---
+  // Each side is named by run id (`base`/`head`) or by latest run on a branch
+  // (`baseBranch`/`headBranch`). `?format=md` (or Accept: text/markdown) returns a
+  // PR-pasteable Markdown summary.
+  app.get('/api/projects/:id/compare', { preHandler: viewer }, async (req, reply) => {
+    const q = req.query as Record<string, string>;
+    const d = db(req.project!.id);
+
+    const base = resolveRunRef(d, { runId: numOrNull(q.base), branch: str(q.baseBranch) });
+    if (!base.ok) return refError(reply, base, 'Base');
+    const head = resolveRunRef(d, { runId: numOrNull(q.head), branch: str(q.headBranch) });
+    if (!head.ok) return refError(reply, head, 'Head');
+
+    const baseRun = d.prepare('SELECT * FROM runs WHERE id = ?').get(base.runId) as RunRow;
+    const headRun = d.prepare('SELECT * FROM runs WHERE id = ?').get(head.runId) as RunRow;
+    const { summary, categories } = compareRuns(d, base.runId, head.runId, { limit: clampLimit(q.limit, 500, 2000) });
+    const comparison: RunComparison = {
+      base: runToSummary(baseRun),
+      head: runToSummary(headRun),
+      summary,
+      categories,
+    };
+
+    const wantsMd = q.format === 'md' || (req.headers.accept ?? '').includes('text/markdown');
+    if (wantsMd) return reply.type('text/markdown').send(formatComparisonMarkdown(comparison));
+    return { comparison };
   });
 
   // --- Delete a run (member) ---

@@ -1,5 +1,15 @@
 import type { Database as Db } from 'better-sqlite3';
-import type { FlakyTestEntry, TestHistoryEntry, TrendPoint, TestStatus } from '@testhistory/shared';
+import type {
+  FlakyTestEntry,
+  TestHistoryEntry,
+  TrendPoint,
+  TestStatus,
+  ChangeCategory,
+  ComparedStatus,
+  ComparedTest,
+  ComparisonBucket,
+  ComparisonSummary,
+} from '@testhistory/shared';
 import { STATUS_NAME } from '../ingest/model.js';
 
 /**
@@ -200,4 +210,190 @@ export function detectFlaky(
   // Most flips first, then most recent activity.
   out.sort((x, y) => y.flips - x.flips || y.fails - x.fails);
   return out;
+}
+
+/** A reference to one side of a comparison: an explicit run id, or "latest on a branch". */
+export interface RunRef {
+  runId?: number | null;
+  branch?: string | null;
+}
+
+export type RunRefResolution =
+  | { ok: true; runId: number }
+  | { ok: false; reason: 'missing_input' | 'run_not_found' | 'branch_empty'; branch?: string };
+
+/**
+ * Resolve one side of a Run Comparison to a concrete run id. An explicit `runId`
+ * takes precedence (verified to exist); otherwise `branch` resolves to the newest
+ * run on that branch. Mirrors {@link resolveAppendTarget}'s discriminated-union style
+ * so the route can map each reason to an HTTP status.
+ */
+export function resolveRunRef(db: Db, ref: RunRef): RunRefResolution {
+  if (ref.runId != null) {
+    const row = db.prepare('SELECT id FROM runs WHERE id = ?').get(ref.runId) as { id: number } | undefined;
+    return row ? { ok: true, runId: row.id } : { ok: false, reason: 'run_not_found' };
+  }
+  if (ref.branch) {
+    const row = db
+      .prepare('SELECT id FROM runs WHERE branch = ? ORDER BY id DESC LIMIT 1')
+      .get(ref.branch) as { id: number } | undefined;
+    return row ? { ok: true, runId: row.id } : { ok: false, reason: 'branch_empty', branch: ref.branch };
+  }
+  return { ok: false, reason: 'missing_input' };
+}
+
+export interface RunComparisonData {
+  summary: ComparisonSummary;
+  categories: Record<ChangeCategory, ComparisonBucket>;
+}
+
+function isFailing(code: number | undefined): boolean {
+  return code === FAILED || code === ERROR;
+}
+
+function comparedStatus(code: number | undefined): ComparedStatus {
+  return code === undefined ? 'absent' : (STATUS_NAME[code] as TestStatus);
+}
+
+/**
+ * Classify a Test's transition between two Runs. `failing` = failed|error;
+ * `passing` = passed; `skipped` and absence are neutral (matching the "gaps"
+ * treatment in flaky detection). First matching rule wins, so the categories are
+ * mutually exclusive:
+ *   1. absent in head            → removedTests
+ *   2. failing in head & base    → stillFailing
+ *   3. failing in head, not base → newlyFailing  (incl. a brand-new failing test —
+ *                                                  merge-gating cares about it)
+ *   4. passed in head, failing in base → newlyFixed
+ *   5. absent in base (present in head, passed/skipped) → newTests
+ *   6. anything else (pass→pass, pass→skip, skip→pass, fail→skip, skip→skip) → null
+ *      (counted as `other`; skipping a test is not fixing it).
+ */
+function classify(base: number | undefined, head: number | undefined): ChangeCategory | null {
+  if (head === undefined) return 'removedTests';
+  if (isFailing(head)) return isFailing(base) ? 'stillFailing' : 'newlyFailing';
+  if (head === PASSED && isFailing(base)) return 'newlyFixed';
+  if (base === undefined) return 'newTests';
+  return null;
+}
+
+/**
+ * Compare two Runs of one Project: how each Test's Status changed from `baseRunId`
+ * to `headRunId`. Pulls both runs' results in one query and diffs them in memory
+ * (no FULL OUTER JOIN — portable and matches the gather-then-fold style of
+ * {@link detectFlaky}). Summary counts are exact; each category's Test list is
+ * capped at `limit` (default 500) with a `truncated` flag. `baseRunId === headRunId`
+ * needs no special-casing (every Test lands on the same side → no regressions/fixes).
+ */
+export function compareRuns(
+  db: Db,
+  baseRunId: number,
+  headRunId: number,
+  opts: { limit?: number } = {},
+): RunComparisonData {
+  const limit = Math.max(1, Math.min(opts.limit ?? 500, 2000));
+
+  const rows = db
+    .prepare(
+      `SELECT r.test_id AS testId, t.suite AS suite, t.name AS name,
+              r.run_id AS runId, r.status AS status, r.duration_ms AS durationMs
+         FROM results r JOIN tests t ON t.id = r.test_id
+        WHERE r.run_id IN (@baseRunId, @headRunId)
+        ORDER BY t.suite, t.name`,
+    )
+    .all({ baseRunId, headRunId }) as {
+    testId: number;
+    suite: string;
+    name: string;
+    runId: number;
+    status: number;
+    durationMs: number | null;
+  }[];
+
+  interface Slot {
+    suite: string;
+    name: string;
+    base?: number;
+    head?: number;
+    baseDurationMs: number | null;
+    headDurationMs: number | null;
+  }
+  const byTest = new Map<number, Slot>();
+  for (const row of rows) {
+    let slot = byTest.get(row.testId);
+    if (!slot) {
+      slot = { suite: row.suite, name: row.name, baseDurationMs: null, headDurationMs: null };
+      byTest.set(row.testId, slot);
+    }
+    // base==head fills both slots from the same rows.
+    if (row.runId === baseRunId) {
+      slot.base = row.status;
+      slot.baseDurationMs = row.durationMs;
+    }
+    if (row.runId === headRunId) {
+      slot.head = row.status;
+      slot.headDurationMs = row.durationMs;
+    }
+  }
+
+  const categories: Record<ChangeCategory, ComparisonBucket> = {
+    newlyFailing: { total: 0, truncated: false, tests: [] },
+    newlyFixed: { total: 0, truncated: false, tests: [] },
+    stillFailing: { total: 0, truncated: false, tests: [] },
+    newTests: { total: 0, truncated: false, tests: [] },
+    removedTests: { total: 0, truncated: false, tests: [] },
+  };
+  let other = 0;
+
+  for (const [testId, slot] of byTest) {
+    const cat = classify(slot.base, slot.head);
+    if (cat === null) {
+      other += 1;
+      continue;
+    }
+    const bucket = categories[cat];
+    bucket.total += 1;
+    if (bucket.tests.length < limit) {
+      bucket.tests.push({
+        testId,
+        suite: slot.suite,
+        name: slot.name,
+        baseStatus: comparedStatus(slot.base),
+        headStatus: comparedStatus(slot.head),
+        baseDurationMs: slot.baseDurationMs,
+        headDurationMs: slot.headDurationMs,
+      });
+    } else {
+      bucket.truncated = true;
+    }
+  }
+
+  const base = db.prepare('SELECT * FROM runs WHERE id = ?').get(baseRunId) as RunCounterRow | undefined;
+  const head = db.prepare('SELECT * FROM runs WHERE id = ?').get(headRunId) as RunCounterRow | undefined;
+  const summary: ComparisonSummary = {
+    regressions: categories.newlyFailing.total,
+    fixed: categories.newlyFixed.total,
+    stillFailing: categories.stillFailing.total,
+    newTests: categories.newTests.total,
+    removedTests: categories.removedTests.total,
+    other,
+    passedDelta: (head?.passed ?? 0) - (base?.passed ?? 0),
+    failedDelta: (head?.failed ?? 0) - (base?.failed ?? 0),
+    erroredDelta: (head?.errored ?? 0) - (base?.errored ?? 0),
+    skippedDelta: (head?.skipped ?? 0) - (base?.skipped ?? 0),
+    totalDelta: (head?.total ?? 0) - (base?.total ?? 0),
+    durationDeltaMs:
+      head?.duration_ms != null && base?.duration_ms != null ? head.duration_ms - base.duration_ms : null,
+  };
+
+  return { summary, categories };
+}
+
+interface RunCounterRow {
+  passed: number;
+  failed: number;
+  errored: number;
+  skipped: number;
+  total: number;
+  duration_ms: number | null;
 }

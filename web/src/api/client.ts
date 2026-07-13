@@ -13,7 +13,19 @@ import type {
   PluginQueryResult,
   NameRule,
   NameRulePreviewSample,
+  RunComparison,
 } from '@testhistory/shared';
+
+/** Query for the two sides of a run comparison. */
+export interface CompareQuery {
+  base?: number;
+  head?: number;
+  baseBranch?: string;
+  headBranch?: string;
+  limit?: number;
+  // Allow passing straight to qs() (which takes a string-keyed record).
+  [k: string]: string | number | undefined;
+}
 
 /** An error thrown when the API returns a non-2xx `{ error: { code, message } }`. */
 export class ApiError extends Error {
@@ -108,6 +120,11 @@ export const api = {
   testHistory: (id: string, testId: number) =>
     req<{ test: TestInfo; history: TestHistoryEntry[] }>('GET', `/api/projects/${id}/tests/${testId}/history`),
   deleteRun: (id: string, runId: number) => req<{ ok: true }>('DELETE', `/api/projects/${id}/runs/${runId}`),
+  compare: (id: string, q: CompareQuery = {}) =>
+    req<{ comparison: RunComparison }>('GET', `/api/projects/${id}/compare${qs(q)}`),
+  // Markdown variant uses raw fetch since `req` assumes a JSON body.
+  compareMarkdown: (id: string, q: CompareQuery = {}) =>
+    fetch(`/api/projects/${id}/compare${qs({ ...q, format: 'md' })}`, { credentials: 'same-origin' }).then((r) => r.text()),
 
   // --- plugins ---
   listPlugins: (id: string) => req<{ plugins: PluginInfo[] }>('GET', `/api/projects/${id}/plugins`),

@@ -9,6 +9,7 @@ import { ProjectOverviewPage } from './pages/ProjectOverview.js';
 import { RunDetailPage } from './pages/RunDetail.js';
 import { TestDetailPage } from './pages/TestDetail.js';
 import { FlakyPage } from './pages/Flaky.js';
+import { ComparePage } from './pages/Compare.js';
 import { SettingsPage } from './pages/Settings.js';
 import { PluginHostPage } from './pages/PluginHostPage.js';
 import { AdminUsersPage } from './pages/AdminUsers.js';
@@ -44,6 +45,7 @@ export const router = createBrowserRouter([
       { path: '/projects/:id/runs/:runId', element: <RunDetailPage /> },
       { path: '/projects/:id/tests/:testId', element: <TestDetailPage /> },
       { path: '/projects/:id/flaky', element: <FlakyPage /> },
+      { path: '/projects/:id/compare', element: <ComparePage /> },
       { path: '/projects/:id/settings', element: <SettingsPage /> },
       { path: '/projects/:id/plugins/:pluginId', element: <PluginHostPage /> },
       {

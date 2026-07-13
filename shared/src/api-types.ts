@@ -131,6 +131,56 @@ export interface NameRulePreviewSample {
   after: { suite: string; name: string };
 }
 
+/** How a Test's Status changed from one Run to another (Run Comparison). */
+export type ChangeCategory =
+  | 'newlyFailing'
+  | 'newlyFixed'
+  | 'stillFailing'
+  | 'newTests'
+  | 'removedTests';
+
+/** A Test's Status in one side of a comparison; `absent` = no Result in that Run. */
+export type ComparedStatus = TestStatus | 'absent';
+
+export interface ComparedTest {
+  testId: number;
+  suite: string;
+  name: string;
+  baseStatus: ComparedStatus;
+  headStatus: ComparedStatus;
+  baseDurationMs: number | null;
+  headDurationMs: number | null;
+}
+
+/** One change category's Tests. `total` is exact; `tests` may be capped (`truncated`). */
+export interface ComparisonBucket {
+  total: number;
+  truncated: boolean;
+  tests: ComparedTest[];
+}
+
+export interface ComparisonSummary {
+  regressions: number; // = categories.newlyFailing.total
+  fixed: number;
+  stillFailing: number;
+  newTests: number;
+  removedTests: number;
+  other: number; // unchanged (pass→pass, skip→skip, fail→skip, …)
+  passedDelta: number;
+  failedDelta: number;
+  erroredDelta: number;
+  skippedDelta: number;
+  totalDelta: number;
+  durationDeltaMs: number | null; // head.durationMs - base.durationMs
+}
+
+export interface RunComparison {
+  base: RunSummary;
+  head: RunSummary;
+  summary: ComparisonSummary;
+  categories: Record<ChangeCategory, ComparisonBucket>;
+}
+
 export interface PluginInfo {
   id: string;
   name: string;
