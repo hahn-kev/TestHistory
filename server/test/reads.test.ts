@@ -98,7 +98,8 @@ describe('results listing', () => {
       headers: { cookie: admin },
     });
     expect(page1.json().results).toHaveLength(2);
-    expect(page1.json().nextCursor).toBe(page1.json().results[1].testId);
+    // Cursor is an offset: next page starts after the 2 rows just returned.
+    expect(page1.json().nextCursor).toBe(2);
 
     const page2 = await t.app.inject({
       method: 'GET',
@@ -109,6 +110,36 @@ describe('results listing', () => {
     expect(page2.json().nextCursor).toBe(null);
     const allIds = [...page1.json().results, ...page2.json().results].map((r: { testId: number }) => r.testId);
     expect(new Set(allIds).size).toBe(4);
+  });
+
+  test('default sort puts failed/error first, passed last; sort by name and duration', async () => {
+    const run = await upload(fx('junit-mixed.xml'));
+
+    const def = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/runs/${run.id}/results`,
+      headers: { cookie: admin },
+    });
+    const statuses = def.json().results.map((r: { status: string }) => r.status);
+    const rank: Record<string, number> = { failed: 0, error: 1, skipped: 2, passed: 3 };
+    const ranks = statuses.map((s: string) => rank[s]);
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+
+    const byName = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/runs/${run.id}/results?sort=name&dir=asc`,
+      headers: { cookie: admin },
+    });
+    const names = byName.json().results.map((r: { name: string }) => r.name);
+    expect(names).toEqual([...names].sort());
+
+    const byDur = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/runs/${run.id}/results?sort=duration&dir=desc`,
+      headers: { cookie: admin },
+    });
+    const durs = byDur.json().results.map((r: { durationMs: number }) => r.durationMs);
+    expect(durs).toEqual([...durs].sort((a, b) => b - a));
   });
 });
 

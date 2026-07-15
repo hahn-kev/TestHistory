@@ -112,7 +112,7 @@ export const api = {
   listResults: (
     id: string,
     runId: number,
-    q: { status?: string; search?: string; suite?: string; cursor?: number; limit?: number } = {},
+    q: { status?: string; search?: string; suite?: string; sort?: string; dir?: string; cursor?: number; limit?: number } = {},
   ) => req<{ results: TestResultRow[]; nextCursor: number | null }>('GET', `/api/projects/${id}/runs/${runId}/results${qs(q)}`),
   trend: (id: string, q: { limit?: number; branch?: string } = {}) =>
     req<{ trend: TrendPoint[] }>('GET', `/api/projects/${id}/trend${qs(q)}`),
