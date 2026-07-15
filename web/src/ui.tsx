@@ -90,6 +90,86 @@ export function GearIcon({ className = 'h-5 w-5' }: { className?: string }) {
   );
 }
 
+// GitHub logo (Iconify `mdi:github`), rendered via the "SVG in CSS" mask method so it
+// inherits the surrounding text color through `currentColor`.
+// https://iconify.design/docs/usage/svg-css/react/
+const GITHUB_MASK =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5c.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34c-.46-1.16-1.11-1.47-1.11-1.47c-.91-.62.07-.6.07-.6c1 .07 1.53 1.03 1.53 1.03c.87 1.52 2.34 1.07 2.91.83c.09-.65.35-1.09.63-1.34c-2.22-.25-4.55-1.11-4.55-4.92c0-1.11.38-2 1.03-2.71c-.1-.25-.45-1.29.1-2.64c0 0 .84-.27 2.75 1.02c.79-.22 1.65-.33 2.5-.33s1.71.11 2.5.33c1.91-1.29 2.75-1.02 2.75-1.02c.55 1.35.2 2.39.1 2.64c.65.71 1.03 1.6 1.03 2.71c0 3.82-2.34 4.66-4.57 4.91c.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2'/%3E%3C/svg%3E\")";
+
+export function GitHubIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-block shrink-0 ${className}`}
+      style={{
+        backgroundColor: 'currentColor',
+        WebkitMaskImage: GITHUB_MASK,
+        maskImage: GITHUB_MASK,
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+        WebkitMaskSize: '100% 100%',
+        maskSize: '100% 100%',
+      }}
+    />
+  );
+}
+
+/** External link to GitHub, prefixed with the GitHub logo. */
+export function GitHubLink({
+  href,
+  children,
+  className = '',
+}: {
+  href: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`inline-flex items-center gap-1 text-primary hover:underline ${className}`}
+    >
+      <GitHubIcon />
+      {children}
+    </a>
+  );
+}
+
+/** GitHub URLs derivable from a run. The CI URL (which the upload action defaults to a
+ *  GitHub Actions run link) is the source of truth for the repo, so commit/branch links
+ *  are only produced when the CI URL is a recognizable Actions run. */
+export interface GitHubRunLinks {
+  ci?: string;
+  commit?: string;
+  branch?: string;
+}
+
+export function githubRunLinks(run: {
+  ciUrl: string | null;
+  commitSha: string | null;
+  branch: string | null;
+}): GitHubRunLinks {
+  const links: GitHubRunLinks = {};
+  if (!run.ciUrl) return links;
+  let url: URL;
+  try {
+    url = new URL(run.ciUrl);
+  } catch {
+    return links;
+  }
+  // Expect a path shaped like /OWNER/REPO/actions/runs/ID (github.com or Enterprise).
+  const parts = url.pathname.split('/').filter(Boolean);
+  const i = parts.indexOf('actions');
+  if (i < 2 || parts[i + 1] !== 'runs') return links;
+  links.ci = run.ciUrl;
+  const repo = `${url.origin}/${parts[i - 2]}/${parts[i - 1]}`;
+  if (run.commitSha) links.commit = `${repo}/commit/${run.commitSha}`;
+  if (run.branch) links.branch = `${repo}/tree/${encodeURIComponent(run.branch)}`;
+  return links;
+}
+
 export function fmtDuration(ms: number | null | undefined): string {
   if (ms == null) return '—';
   if (ms < 1000) return `${Math.round(ms)}ms`;
