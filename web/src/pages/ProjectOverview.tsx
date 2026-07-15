@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks.js';
-import { Card, EmptyState, ErrorBox, GitHubIcon, Spinner, StatusChip, fmtDate, fmtDuration, githubRunLinks } from '../ui.js';
+import { AppIcon, Card, EmptyState, ErrorBox, GitHubIcon, Spinner, StatusChip, fmtDate, fmtDuration, githubRunLinks } from '../ui.js';
 import { ProjectNav } from '../components/ProjectNav.js';
 import { BranchFilter } from '../components/BranchFilter.js';
 import { TrendChart } from '../components/TrendChart.js';
@@ -73,11 +73,25 @@ export function ProjectOverviewPage() {
                   </td>
                   <td className="px-4 py-2 text-muted">{r.branch ?? '—'}</td>
                   <td className="px-4 py-2">
-                    <span className="text-pass">{r.passed}✓</span>{' '}
-                    <span className="text-fail">{r.failed}✗</span>{' '}
-                    <span className="text-error">{r.errored}!</span>{' '}
-                    <span className="text-skip">{r.skipped}⊘</span>
-                    <span className="ml-2 text-muted">/ {r.total}</span>
+                    <span className="inline-flex items-center gap-3">
+                      <span className="inline-flex items-center gap-0.5 text-pass">
+                        {r.passed}
+                        <AppIcon name="check" className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 text-fail">
+                        {r.failed}
+                        <AppIcon name="close" className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 text-error">
+                        {r.errored}
+                        <AppIcon name="alert" className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="inline-flex items-center gap-0.5 text-skip">
+                        {r.skipped}
+                        <AppIcon name="minus-circle" className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="text-muted">/ {r.total}</span>
+                    </span>
                   </td>
                   <td className="px-4 py-2 text-muted">{fmtDuration(r.durationMs)}</td>
                   <td className="px-4 py-2 text-muted">{fmtDate(r.createdAt)}</td>

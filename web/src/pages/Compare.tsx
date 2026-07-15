@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import type { ChangeCategory, ComparedStatus, ComparedTest, RunComparison } from '@testhistory/shared';
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks.js';
-import { Button, Card, EmptyState, ErrorBox, Field, Input, Spinner, fmtDate, fmtDuration } from '../ui.js';
+import { AppIcon, Button, Card, EmptyState, ErrorBox, Field, Input, Spinner, fmtDate, fmtDuration } from '../ui.js';
 import { ProjectNav } from '../components/ProjectNav.js';
 
 const CATEGORY_META: { key: ChangeCategory; label: string; tone: string }[] = [
@@ -138,8 +138,9 @@ function Comparison({ projectId, data }: { projectId: string; data: RunCompariso
     <div className="space-y-5">
       <Card className="space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm text-fg">
-            <RunRef label="Base" projectId={projectId} run={base} /> <span className="text-muted">→</span>{' '}
+          <div className="inline-flex flex-wrap items-center gap-1 text-sm text-fg">
+            <RunRef label="Base" projectId={projectId} run={base} />
+            <AppIcon name="arrow-right" className="h-4 w-4 text-muted" />
             <RunRef label="Head" projectId={projectId} run={head} />
           </div>
           <Button variant="ghost" onClick={copyMarkdown}>

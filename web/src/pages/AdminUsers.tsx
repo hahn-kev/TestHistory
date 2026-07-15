@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../api/client.js';
 import { useAsync } from '../hooks.js';
-import { Button, Card, ErrorBox, Field, Input, Spinner, fmtDate } from '../ui.js';
+import { AppIcon, Button, Card, ErrorBox, Field, Input, Spinner, fmtDate } from '../ui.js';
 
 export function AdminUsersPage() {
   const users = useAsync(() => api.listUsers(), []);
@@ -12,8 +12,9 @@ export function AdminUsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <Link to="/" className="text-sm text-muted hover:text-fg">
-            ← Dashboard
+          <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg">
+            <AppIcon name="arrow-left" className="h-4 w-4" />
+            Dashboard
           </Link>
           <h1 className="mt-1 text-2xl font-semibold text-fg">Users</h1>
         </div>
