@@ -112,12 +112,19 @@ export function RunDetailPage() {
           </Link>
           <h1 className="mt-1 text-2xl font-semibold text-fg">Run #{r.id}</h1>
         </div>
-        <Link
-          to={`/projects/${id}/compare?head=${r.id}`}
-          className="rounded-md border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-surface-2"
-        >
-          Compare…
-        </Link>
+        <div className="flex items-center gap-3">
+          {gh.ci && (
+            <GitHubLink href={gh.ci} className="text-sm font-medium">
+              Actions run
+            </GitHubLink>
+          )}
+          <Link
+            to={`/projects/${id}/compare?head=${r.id}`}
+            className="rounded-md border border-border px-3 py-2 text-sm font-medium text-fg hover:bg-surface-2"
+          >
+            Compare…
+          </Link>
+        </div>
       </div>
 
       <Card className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -137,7 +144,6 @@ export function RunDetailPage() {
         />
         <Meta label="Started" value={fmtDate(r.startedAt)} />
         <Meta label="Duration" value={fmtDuration(r.durationMs)} />
-        {gh.ci && <Meta label="CI" value={<GitHubLink href={gh.ci}>Actions run</GitHubLink>} />}
         <Meta label="Total" value={String(r.total)} />
         <Meta label="Passed" value={String(r.passed)} className="text-pass" />
         <Meta label="Failed / Error" value={`${r.failed} / ${r.errored}`} className="text-fail" />
