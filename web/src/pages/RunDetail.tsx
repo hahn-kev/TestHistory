@@ -203,14 +203,14 @@ export function RunDetailPage() {
       {!loading && rows.length > 0 && (
         <>
           <Card className="overflow-hidden">
-            <table className="w-full text-sm">
+            <table className="w-full table-fixed text-sm">
               <thead className="bg-surface-2 text-left text-muted">
                 <tr>
                   <th className="w-8 px-2 py-2" aria-label="Expand" />
-                  <SortHeader label="Status" col="status" sort={sort} dir={dir} onSort={toggleSort} />
-                  <th className="px-4 py-2">Suite</th>
+                  <SortHeader label="Status" col="status" sort={sort} dir={dir} onSort={toggleSort} thClassName="w-24" />
+                  <th className="w-[28%] px-4 py-2">Suite</th>
                   <SortHeader label="Test" col="name" sort={sort} dir={dir} onSort={toggleSort} />
-                  <SortHeader label="Duration" col="duration" sort={sort} dir={dir} onSort={toggleSort} />
+                  <SortHeader label="Duration" col="duration" sort={sort} dir={dir} onSort={toggleSort} thClassName="w-28" />
                 </tr>
               </thead>
               <tbody>
@@ -239,16 +239,18 @@ function SortHeader({
   sort,
   dir,
   onSort,
+  thClassName = '',
 }: {
   label: string;
   col: SortKey;
   sort: SortKey;
   dir: SortDir;
   onSort: (col: SortKey) => void;
+  thClassName?: string;
 }) {
   const active = sort === col;
   return (
-    <th className="px-4 py-2">
+    <th className={`px-4 py-2 ${thClassName}`}>
       <button
         type="button"
         onClick={() => onSort(col)}
@@ -286,20 +288,23 @@ function ResultRow({ projectId, row }: { projectId: string; row: TestResultRow }
         <td className="w-8 px-2 py-2 text-center text-muted">
           {expandable && <AppIcon name={open ? 'chevron-down' : 'chevron-right'} className="h-4 w-4 align-middle" />}
         </td>
-        <td className="px-4 py-2">
+        <td className="px-4 py-2 whitespace-nowrap">
           <StatusChip status={row.status} />
         </td>
-        <td className="px-4 py-2 text-muted">{row.suite}</td>
-        <td className="px-4 py-2">
+        <td className="max-w-0 truncate px-4 py-2 text-muted" title={row.suite || undefined}>
+          {row.suite}
+        </td>
+        <td className="max-w-0 px-4 py-2">
           <Link
             to={`/projects/${projectId}/tests/${row.testId}`}
-            className="text-primary hover:underline"
+            className="block truncate text-primary hover:underline"
+            title={row.name}
             onClick={(e) => e.stopPropagation()}
           >
             {row.name}
           </Link>
         </td>
-        <td className="px-4 py-2 text-muted">{fmtDuration(row.durationMs)}</td>
+        <td className="px-4 py-2 whitespace-nowrap text-muted">{fmtDuration(row.durationMs)}</td>
       </tr>
       {open && expandable && (
         <tr className="border-t border-border bg-surface-2">
