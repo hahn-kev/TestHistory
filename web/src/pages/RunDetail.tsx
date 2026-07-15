@@ -206,6 +206,7 @@ export function RunDetailPage() {
             <table className="w-full table-fixed text-sm">
               <thead className="bg-surface-2 text-left text-muted">
                 <tr>
+                  <th className="w-8 px-2 py-2" aria-label="Expand" />
                   <SortHeader label="Status" col="status" sort={sort} dir={dir} onSort={toggleSort} thClassName="w-24" />
                   <th className="w-[28%] px-4 py-2">Suite</th>
                   <SortHeader label="Test" col="name" sort={sort} dir={dir} onSort={toggleSort} />
@@ -284,6 +285,9 @@ function ResultRow({ projectId, row }: { projectId: string; row: TestResultRow }
         className={`border-t border-border ${expandable ? 'cursor-pointer hover:bg-surface-2' : ''}`}
         onClick={() => expandable && setOpen((v) => !v)}
       >
+        <td className="w-8 px-2 py-2 text-center text-muted">
+          {expandable && <AppIcon name={open ? 'chevron-down' : 'chevron-right'} className="h-4 w-4 align-middle" />}
+        </td>
         <td className="px-4 py-2 whitespace-nowrap">
           <StatusChip status={row.status} />
         </td>
@@ -291,25 +295,20 @@ function ResultRow({ projectId, row }: { projectId: string; row: TestResultRow }
           {row.suite}
         </td>
         <td className="max-w-0 px-4 py-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <Link
-              to={`/projects/${projectId}/tests/${row.testId}`}
-              className="min-w-0 truncate text-primary hover:underline"
-              title={row.name}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {row.name}
-            </Link>
-            {expandable && (
-              <AppIcon name={open ? 'chevron-down' : 'chevron-right'} className="h-4 w-4 shrink-0 text-muted" />
-            )}
-          </div>
+          <Link
+            to={`/projects/${projectId}/tests/${row.testId}`}
+            className="block truncate text-primary hover:underline"
+            title={row.name}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {row.name}
+          </Link>
         </td>
         <td className="px-4 py-2 whitespace-nowrap text-muted">{fmtDuration(row.durationMs)}</td>
       </tr>
       {open && expandable && (
         <tr className="border-t border-border bg-surface-2">
-          <td colSpan={4} className="px-4 py-3">
+          <td colSpan={5} className="px-4 py-3">
             {row.message && <pre className="whitespace-pre-wrap text-xs text-fail">{row.message}</pre>}
             {row.stack && <pre className="mt-2 whitespace-pre-wrap text-xs text-muted">{row.stack}</pre>}
           </td>
