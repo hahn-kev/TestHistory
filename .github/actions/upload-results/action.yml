@@ -28,11 +28,16 @@ inputs:
   branch:
     description: 'The VCS branch name.'
     required: false
-    default: '${{ github.ref_name }}'
+    # On pull_request events github.ref_name is the merge ref (e.g. "3/merge");
+    # github.head_ref is the real source branch. Falls back to ref_name for pushes.
+    default: '${{ github.head_ref || github.ref_name }}'
   commit:
-    description: 'The commit SHA.'
+    description: 'The commit SHA. Also the commit the GitHub check run is attached to.'
     required: false
-    default: '${{ github.sha }}'
+    # On pull_request events github.sha is the synthetic merge commit, which the PR
+    # Checks tab does not display. Use the PR head SHA so the check shows on the PR
+    # (and TestHistory records the real commit). Falls back to github.sha for pushes.
+    default: '${{ github.event.pull_request.head.sha || github.sha }}'
   format:
     description: 'Format override (e.g. junit, nunit2, nunit3, xunit, trx).'
     required: false

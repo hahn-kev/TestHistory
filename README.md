@@ -91,8 +91,8 @@ To use it, add a step like this in your workflow:
 | `files` | Multiline glob pattern(s) to match test result files. | **Required** |
 | `on-no-files` | Behavior when no files match the patterns (`error` or `ignore`). | `error` |
 | `run-key` | Unique key identifying this build run. | `${{ github.run_id }}-${{ github.run_attempt }}` |
-| `branch` | The VCS branch name. | `${{ github.ref_name }}` |
-| `commit` | The commit SHA. | `${{ github.sha }}` |
+| `branch` | The VCS branch name. | PR head branch, else `${{ github.ref_name }}` |
+| `commit` | The commit SHA (also the SHA the check run attaches to). | PR head SHA, else `${{ github.sha }}` |
 | `format` | Override parser format (e.g., `junit`, `nunit3`, `xunit`, `trx`). | Auto-detected |
 | `label` | A custom label for this run. | (None) |
 | `ci-url` | Link back to the CI run. | `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}` |
