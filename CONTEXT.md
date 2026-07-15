@@ -28,7 +28,7 @@ Glossary of domain terms. Terms here are canonical: code, API, UI, and docs use 
 
 - **Member** — a user attached to a Project, with role `owner` or `member`. Membership governs *managing* a Project; *reading* is governed by the Project's visibility. A `member` handles day-to-day data (uploading and deleting Runs, tokens, plugins); an `owner` additionally controls the Project's identity and existence (rename, visibility, membership, deletion). Admins implicitly have owner powers on every Project.
 
-- **Private Project** — a Project whose contents are visible to its Members (and admins) only. A non-private Project is readable by any signed-in user; managing it still requires membership.
+- **Private Project** — a Project whose contents are visible to its Members (and admins) only. A non-private Project is readable by anyone with the link (signed-in or anonymous); managing it still requires membership.
 
 - **API Token** — a project-scoped bearer credential for autonomous uploads (CI). Shown in plaintext exactly once at creation; revocable.
 

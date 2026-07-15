@@ -14,6 +14,17 @@ import { SettingsPage } from './pages/Settings.js';
 import { PluginHostPage } from './pages/PluginHostPage.js';
 import { AdminUsersPage } from './pages/AdminUsers.js';
 
+/** Shell for routes that work signed-in or anonymously (public project deep links). */
+function OptionalAuth() {
+  const { loading } = useAuth();
+  if (loading) return <Spinner />;
+  return (
+    <AppShell>
+      <Outlet />
+    </AppShell>
+  );
+}
+
 /** Gate authenticated routes: loader hits /api/auth/me (via AuthProvider); 401 → /login. */
 function RequireAuth() {
   const { user, loading } = useAuth();
@@ -38,16 +49,21 @@ export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/setup', element: <SetupPage /> },
   {
-    element: <RequireAuth />,
+    element: <OptionalAuth />,
     children: [
-      { path: '/', element: <DashboardPage /> },
       { path: '/projects/:id', element: <ProjectOverviewPage /> },
       { path: '/projects/:id/runs/:runId', element: <RunDetailPage /> },
       { path: '/projects/:id/tests/:testId', element: <TestDetailPage /> },
       { path: '/projects/:id/flaky', element: <FlakyPage /> },
       { path: '/projects/:id/compare', element: <ComparePage /> },
-      { path: '/projects/:id/settings', element: <SettingsPage /> },
       { path: '/projects/:id/plugins/:pluginId', element: <PluginHostPage /> },
+    ],
+  },
+  {
+    element: <RequireAuth />,
+    children: [
+      { path: '/', element: <DashboardPage /> },
+      { path: '/projects/:id/settings', element: <SettingsPage /> },
       {
         element: <RequireAdmin />,
         children: [{ path: '/admin/users', element: <AdminUsersPage /> }],

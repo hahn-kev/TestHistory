@@ -31,14 +31,18 @@ declare module 'fastify' {
  * Compute the requester's effective access to a project.
  * - admins are implicit owners everywhere
  * - members get their stored role (owner/member)
- * - a signed-in non-member gets `viewer` on public projects, `none` on private
+ * - anyone (signed-in or anonymous) gets `viewer` on public projects
+ * - private projects: members/admins only (`none` for everyone else)
  */
 export function computeAccess(
   core: Db,
   project: ProjectRow,
   user: { id: number; role: 'admin' | 'user' } | null,
 ): { level: AccessLevel; role: ProjectRole | null } {
-  if (!user) return { level: 'none', role: null };
+  if (!user) {
+    if (!project.private) return { level: 'viewer', role: null };
+    return { level: 'none', role: null };
+  }
   if (user.role === 'admin') return { level: 'owner', role: null };
 
   const member = core

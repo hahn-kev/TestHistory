@@ -22,28 +22,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 Admin
               </Link>
             )}
-            <div className="relative">
-              <button
-                onClick={() => setMenuOpen((v) => !v)}
+            {user ? (
+              <div className="relative">
+                <button
+                  onClick={() => setMenuOpen((v) => !v)}
+                  className="rounded-md border border-border px-3 py-1.5 text-sm text-fg hover:bg-surface-2"
+                >
+                  {user.displayName}
+                </button>
+                {menuOpen && (
+                  <div className="absolute right-0 z-10 mt-1 w-44 rounded-md border border-border bg-surface py-1 shadow-lg">
+                    <div className="px-3 py-1.5 text-xs text-muted">{user.email}</div>
+                    <button
+                      className="block w-full px-3 py-1.5 text-left text-sm text-fg hover:bg-surface-2"
+                      onClick={async () => {
+                        await logout();
+                        navigate('/login');
+                      }}
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link
+                to="/login"
                 className="rounded-md border border-border px-3 py-1.5 text-sm text-fg hover:bg-surface-2"
               >
-                {user?.displayName ?? 'Account'}
-              </button>
-              {menuOpen && (
-                <div className="absolute right-0 z-10 mt-1 w-44 rounded-md border border-border bg-surface py-1 shadow-lg">
-                  <div className="px-3 py-1.5 text-xs text-muted">{user?.email}</div>
-                  <button
-                    className="block w-full px-3 py-1.5 text-left text-sm text-fg hover:bg-surface-2"
-                    onClick={async () => {
-                      await logout();
-                      navigate('/login');
-                    }}
-                  >
-                    Sign out
-                  </button>
-                </div>
-              )}
-            </div>
+                Sign in
+              </Link>
+            )}
           </div>
         </div>
       </header>

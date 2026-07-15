@@ -187,4 +187,22 @@ describe('viewer access', () => {
     const priv = await t.app.inject({ method: 'GET', url: `/api/projects/${projectId}/runs`, headers: { cookie: stranger } });
     expect(priv.statusCode).toBe(404);
   });
+
+  test('anonymous can read non-private project data; private → 404; delete → 404', async () => {
+    const run = await upload(fx('junit-mixed.xml'));
+
+    const pub = await t.app.inject({ method: 'GET', url: `/api/projects/${projectId}/runs` });
+    expect(pub.statusCode).toBe(200);
+    expect(pub.json().runs.length).toBeGreaterThan(0);
+
+    const detail = await t.app.inject({ method: 'GET', url: `/api/projects/${projectId}/runs/${run.id}` });
+    expect(detail.statusCode).toBe(200);
+
+    const del = await t.app.inject({ method: 'DELETE', url: `/api/projects/${projectId}/runs/${run.id}` });
+    expect(del.statusCode).toBe(404);
+
+    await t.app.inject({ method: 'PATCH', url: `/api/projects/${projectId}`, headers: { cookie: admin }, payload: { private: true } });
+    const priv = await t.app.inject({ method: 'GET', url: `/api/projects/${projectId}/runs` });
+    expect(priv.statusCode).toBe(404);
+  });
 });

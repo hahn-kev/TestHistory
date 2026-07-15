@@ -55,7 +55,7 @@ export function DangerTab({
               void save({ private: e.target.checked });
             }}
           />
-          Private (visible to members and admins only)
+          Private (members and admins only; otherwise anyone with the link can view)
         </label>
       </Card>
 

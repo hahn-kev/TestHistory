@@ -77,6 +77,47 @@ describe('visibility matrix', () => {
     expect(names).not.toContain('PrivateProj');
   });
 
+  test('anonymous can read public project; private → 404; mutations → 404', async () => {
+    await createUser(t.app, admin, 'owner3@example.com');
+    const owner = await login(t.app, 'owner3@example.com', 'password123');
+    const pub = await createProject(owner, 'AnonPublic', false);
+    const priv = await createProject(owner, 'AnonPrivate', true);
+
+    // Public readable without a session.
+    let res = await t.app.inject({ method: 'GET', url: `/api/projects/${pub}` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().project.name).toBe('AnonPublic');
+    expect(res.json().project.myRole).toBe(null);
+
+    // Runs list also works anonymously.
+    res = await t.app.inject({ method: 'GET', url: `/api/projects/${pub}/runs` });
+    expect(res.statusCode).toBe(200);
+
+    // Private → 404.
+    res = await t.app.inject({ method: 'GET', url: `/api/projects/${priv}` });
+    expect(res.statusCode).toBe(404);
+
+    // Listing still requires login.
+    res = await t.app.inject({ method: 'GET', url: '/api/projects' });
+    expect(res.statusCode).toBe(401);
+
+    // Mutations stay blocked (404 hides the project).
+    res = await t.app.inject({
+      method: 'PATCH',
+      url: `/api/projects/${pub}`,
+      payload: { description: 'hacked' },
+    });
+    expect(res.statusCode).toBe(404);
+
+    res = await t.app.inject({
+      method: 'POST',
+      url: `/api/projects/${pub}/runs?format=junit`,
+      headers: { 'content-type': 'application/xml' },
+      payload: '<testsuites/>',
+    });
+    expect(res.statusCode).toBe(404);
+  });
+
   test('admin sees all projects including private', async () => {
     await createUser(t.app, admin, 'owner2@example.com');
     const owner = await login(t.app, 'owner2@example.com', 'password123');

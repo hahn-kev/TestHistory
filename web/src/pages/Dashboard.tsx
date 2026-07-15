@@ -83,7 +83,7 @@ function CreateProject({ onClose, onCreated }: { onClose: () => void; onCreated:
         </Field>
         <label className="flex items-center gap-2 text-sm text-fg">
           <input type="checkbox" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
-          Private (visible to members only)
+          Private (members only; otherwise anyone with the link can view)
         </label>
         {error && <ErrorBox message={error} />}
         <div className="flex gap-2">

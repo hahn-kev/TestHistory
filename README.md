@@ -125,7 +125,7 @@ GET /api/projects/<id>/compare?baseBranch=main&head=<runId>&format=md  → Markd
 `?format=md` (or `Accept: text/markdown`) returns a compact summary suitable for pasting
 into a PR comment; it ends with a stable `<!-- testhistory-compare -->` marker so a bot can
 find and update its own comment in place. Like all read endpoints, `/compare` is authorized
-by **viewer** access (a signed-in session; project tokens are for uploads only). Errors:
+by **viewer** access (a session or anonymous visit to a public project; project tokens are for uploads only). Errors:
 **400** if a side names neither a run id nor a branch; **404** for an unknown run id or a
 branch with no runs. A brand-new test that fails counts as *newly failing* (a merge-gating
 signal), and `fail → skip` is treated as unchanged, not fixed.
@@ -164,9 +164,10 @@ All knobs are environment variables (see `server/src/config.ts`):
 ## Access model
 
 - Any signed-in user can **create** a project (and becomes its owner).
-- Projects are **public to all signed-in users** by default; a per-project `private`
-  flag restricts reads to members and admins.
-- **viewer** (read, incl. running plugins) → any signed-in user unless private.
+- Projects are **public by default** (anyone with the project URL can view, including
+  anonymous visitors); a per-project `private` flag restricts reads to members and admins.
+  The project list / dashboard still requires login.
+- **viewer** (read, incl. running plugins) → anyone with the link unless private.
   **member** (upload/delete runs, tokens, plugins, name rules) → project members.
   **owner** (rename, privacy, membership, delete) → project owners. Admins are implicit
   owners everywhere. Non-viewers get **404** (not 403) on project routes.
