@@ -9,6 +9,7 @@ import { DbManager } from './db/project-db.js';
 import { SESSION_COOKIE, resolveSession, sweepExpiredSessions } from './auth/sessions.js';
 import { authRoutes } from './routes/auth.js';
 import { adminUserRoutes } from './routes/admin-users.js';
+import { adminProjectRoutes } from './routes/admin-projects.js';
 import { projectRoutes } from './routes/projects.js';
 import { memberRoutes } from './routes/members.js';
 import { tokenRoutes } from './routes/tokens.js';
@@ -77,6 +78,7 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
 
   await app.register(authRoutes);
   await app.register(adminUserRoutes);
+  await app.register(adminProjectRoutes);
   await app.register(projectRoutes);
   await app.register(memberRoutes);
   await app.register(tokenRoutes);

@@ -28,6 +28,24 @@ export interface ProjectInfo {
   lastRun?: RunSummary | null;
 }
 
+/** Admin-only per-project size accounting, for spotting projects growing too large. */
+export interface ProjectSizeInfo {
+  id: string;
+  name: string;
+  private: boolean;
+  createdAt: string;
+  runCount: number;
+  testCount: number;
+  resultCount: number;
+  /** On-disk size of the project's SQLite file, including WAL/SHM sidecars. */
+  dbBytes: number;
+  pluginCount: number;
+  pluginBytes: number;
+  /** dbBytes + pluginBytes. */
+  totalBytes: number;
+  lastRunAt: string | null;
+}
+
 export interface ProjectMemberInfo {
   userId: number;
   email: string;

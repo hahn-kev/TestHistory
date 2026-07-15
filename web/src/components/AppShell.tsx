@@ -18,9 +18,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3">
             <ThemeSwitcher />
             {user?.role === 'admin' && (
-              <Link to="/admin/users" className="text-sm text-muted hover:text-fg">
-                Admin
-              </Link>
+              <>
+                <Link to="/admin/users" className="text-sm text-muted hover:text-fg">
+                  Users
+                </Link>
+                <Link to="/admin/projects" className="text-sm text-muted hover:text-fg">
+                  Project sizes
+                </Link>
+              </>
             )}
             {user ? (
               <div className="relative">

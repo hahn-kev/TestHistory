@@ -211,3 +211,16 @@ export function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleString();
 }
+
+export function fmtBytes(bytes: number | null | undefined): string {
+  if (bytes == null) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let n = bytes / 1024;
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  return `${n.toFixed(n < 10 ? 1 : 0)} ${units[i]}`;
+}
