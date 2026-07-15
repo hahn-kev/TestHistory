@@ -26,11 +26,13 @@ inputs:
     required: false
     default: '${{ github.run_id }}-${{ github.run_attempt }}'
   branch:
-    description: 'The VCS branch name.'
+    description: 'The VCS branch name (on pull_request events, the "<n>/merge" ref).'
     required: false
-    # On pull_request events github.ref_name is the merge ref (e.g. "3/merge");
-    # github.head_ref is the real source branch. Falls back to ref_name for pushes.
-    default: '${{ github.head_ref || github.ref_name }}'
+    # Use github.ref_name (NOT github.head_ref) so pull_request runs carry the
+    # "<n>/merge" merge ref: TestHistory turns that into a link to the PR. A real
+    # branch link (github.head_ref -> tree/<branch>) would 404 for fork PRs and
+    # deleted branches, and loses the PR association entirely. Pushes get the branch.
+    default: '${{ github.ref_name }}'
   commit:
     description: 'The commit SHA. Also the commit the GitHub check run is attached to.'
     required: false
