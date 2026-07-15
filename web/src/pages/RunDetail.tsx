@@ -10,6 +10,11 @@ const PAGE_SIZE = 50;
 /** Select sentinel for the empty-suite option (HTML cannot distinguish "" from "All suites"). */
 const EMPTY_SUITE = '__empty__';
 
+type SortKey = 'status' | 'name' | 'duration';
+type SortDir = 'asc' | 'desc';
+/** Direction applied when a column is first selected (before toggling). */
+const DEFAULT_DIR: Record<SortKey, SortDir> = { status: 'asc', name: 'asc', duration: 'desc' };
+
 export function RunDetailPage() {
   const { id = '', runId = '' } = useParams();
   const rid = Number(runId);
@@ -18,6 +23,17 @@ export function RunDetailPage() {
   const [search, setSearch] = useState('');
   /** `undefined` = all suites; `''` = exact empty suite. */
   const [suite, setSuite] = useState<string | undefined>(undefined);
+  const [sort, setSort] = useState<SortKey>('status');
+  const [dir, setDir] = useState<SortDir>('asc');
+
+  /** Clicking the active column flips direction; a new column resets to its default direction. */
+  const toggleSort = (key: SortKey) => {
+    if (key === sort) setDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSort(key);
+      setDir(DEFAULT_DIR[key]);
+    }
+  };
 
   const [rows, setRows] = useState<TestResultRow[]>([]);
   const [nextCursor, setNextCursor] = useState<number | null>(null);
@@ -36,6 +52,8 @@ export function RunDetailPage() {
         status: status || undefined,
         search: search || undefined,
         suite,
+        sort,
+        dir,
         limit: PAGE_SIZE,
       })
       .then((data) => {
@@ -53,7 +71,7 @@ export function RunDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, rid, status, search, suite]);
+  }, [id, rid, status, search, suite, sort, dir]);
 
   const loadMore = useCallback(async () => {
     if (nextCursor == null || loadingMore) return;
@@ -64,6 +82,8 @@ export function RunDetailPage() {
         status: status || undefined,
         search: search || undefined,
         suite,
+        sort,
+        dir,
         cursor: nextCursor,
         limit: PAGE_SIZE,
       });
@@ -74,7 +94,7 @@ export function RunDetailPage() {
     } finally {
       setLoadingMore(false);
     }
-  }, [id, rid, status, search, suite, nextCursor, loadingMore]);
+  }, [id, rid, status, search, suite, sort, dir, nextCursor, loadingMore]);
 
   if (run.loading) return <Spinner />;
   if (run.error) return <ErrorBox message={run.error} />;
@@ -165,10 +185,10 @@ export function RunDetailPage() {
             <table className="w-full text-sm">
               <thead className="bg-surface-2 text-left text-muted">
                 <tr>
-                  <th className="px-4 py-2">Status</th>
+                  <SortHeader label="Status" col="status" sort={sort} dir={dir} onSort={toggleSort} />
                   <th className="px-4 py-2">Suite</th>
-                  <th className="px-4 py-2">Test</th>
-                  <th className="px-4 py-2">Duration</th>
+                  <SortHeader label="Test" col="name" sort={sort} dir={dir} onSort={toggleSort} />
+                  <SortHeader label="Duration" col="duration" sort={sort} dir={dir} onSort={toggleSort} />
                 </tr>
               </thead>
               <tbody>
@@ -188,6 +208,35 @@ export function RunDetailPage() {
         </>
       )}
     </div>
+  );
+}
+
+function SortHeader({
+  label,
+  col,
+  sort,
+  dir,
+  onSort,
+}: {
+  label: string;
+  col: SortKey;
+  sort: SortKey;
+  dir: SortDir;
+  onSort: (col: SortKey) => void;
+}) {
+  const active = sort === col;
+  return (
+    <th className="px-4 py-2">
+      <button
+        type="button"
+        onClick={() => onSort(col)}
+        className={`inline-flex items-center gap-1 hover:text-fg ${active ? 'text-fg' : ''}`}
+        aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      >
+        {label}
+        <span className="text-xs">{active ? (dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+      </button>
+    </th>
   );
 }
 

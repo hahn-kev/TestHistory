@@ -65,6 +65,22 @@ function str(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 ? v : null;
 }
 
+/**
+ * Whitelist of sortable columns for the results listing → SQL expression.
+ * `status` ranks problems first (failed/error, then skipped, passed last) rather than
+ * by raw status code. Values come from a fixed map, never interpolated user input.
+ */
+const RESULT_SORT: Record<string, string> = {
+  status: 'CASE r.status WHEN 1 THEN 0 WHEN 2 THEN 1 WHEN 3 THEN 2 ELSE 3 END',
+  name: 't.name',
+  duration: 'r.duration_ms',
+};
+
+function resolveSort(sort: unknown, dir: unknown): { column: string; dir: 'ASC' | 'DESC' } {
+  const key = typeof sort === 'string' && sort in RESULT_SORT ? sort : 'status';
+  return { column: RESULT_SORT[key], dir: dir === 'desc' ? 'DESC' : 'ASC' };
+}
+
 /** Map a failed run-reference resolution to an HTTP error (`side` is "Base"/"Head"). */
 function refError(reply: import('fastify').FastifyReply, res: RunRefResolution & { ok: false }, side: string) {
   if (res.reason === 'missing_input') {
@@ -129,13 +145,18 @@ export async function readRoutes(app: FastifyInstance) {
     const runId = Number((req.params as { runId: string }).runId);
     const q = req.query as Record<string, string | undefined>;
     const limit = clampLimit(q.limit);
-    const cursor = numOrNull(q.cursor);
+    // Cursor is an offset here: results within a run are static while viewing, so offset
+    // pagination stays consistent and supports arbitrary sort orders that keyset can't.
+    const offset = Math.max(0, numOrNull(q.cursor) ?? 0);
     const statusName = str(q.status) as TestStatus | null;
     const statusCode = statusName && statusName in STATUS_CODE ? STATUS_CODE[statusName] : null;
     const search = str(q.search);
     const like = search ? `%${search}%` : null;
     // Empty string is a valid suite filter (tests with no suite); omit param = no filter.
     const suite = q.suite !== undefined ? q.suite : null;
+    const { column, dir } = resolveSort(q.sort, q.dir);
+    // r.test_id is appended as a stable tiebreaker so paging is deterministic.
+    const orderBy = `${column} ${dir}, r.test_id ASC`;
 
     const rows = db(req.project!.id)
       .prepare(
@@ -146,10 +167,9 @@ export async function readRoutes(app: FastifyInstance) {
             AND (@statusCode IS NULL OR r.status = @statusCode)
             AND (@suite IS NULL OR t.suite = @suite)
             AND (@like IS NULL OR t.suite LIKE @like OR t.name LIKE @like)
-            AND (@cursor IS NULL OR r.test_id > @cursor)
-          ORDER BY r.test_id ASC LIMIT @limit`,
+          ORDER BY ${orderBy} LIMIT @limit OFFSET @offset`,
       )
-      .all({ runId, statusCode, suite, like, cursor, limit: limit + 1 }) as (Omit<TestResultRow, 'status'> & { statusCode: number })[];
+      .all({ runId, statusCode, suite, like, limit: limit + 1, offset }) as (Omit<TestResultRow, 'status'> & { statusCode: number })[];
 
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
@@ -157,7 +177,7 @@ export async function readRoutes(app: FastifyInstance) {
       ...rest,
       status: STATUS_NAME[sc] as TestStatus,
     }));
-    return { results, nextCursor: hasMore ? page[page.length - 1].testId : null };
+    return { results, nextCursor: hasMore ? offset + limit : null };
   });
 
   // --- Trend (analytics) ---
