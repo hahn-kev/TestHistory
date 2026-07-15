@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import type { TestResultRow, TestStatus } from '@testhistory/shared';
 import { ApiError, api } from '../api/client.js';
 import { useAsync } from '../hooks.js';
-import { Button, Card, EmptyState, ErrorBox, GitHubLink, Input, Spinner, StatusChip, fmtDate, fmtDuration, githubRunLinks } from '../ui.js';
+import { AppIcon, Button, Card, EmptyState, ErrorBox, GitHubLink, Input, Spinner, StatusChip, fmtDate, fmtDuration, githubRunLinks } from '../ui.js';
 
 const STATUSES: (TestStatus | '')[] = ['', 'passed', 'failed', 'error', 'skipped'];
 const PAGE_SIZE = 50;
@@ -107,8 +107,9 @@ export function RunDetailPage() {
     <div className="space-y-5">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <Link to={`/projects/${id}`} className="text-sm text-muted hover:text-fg">
-            ← Back to project
+          <Link to={`/projects/${id}`} className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg">
+            <AppIcon name="arrow-left" className="h-4 w-4" />
+            Back to project
           </Link>
           <h1 className="mt-1 text-2xl font-semibold text-fg">Run #{r.id}</h1>
         </div>
@@ -256,7 +257,10 @@ function SortHeader({
         aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
       >
         {label}
-        <span className="text-xs">{active ? (dir === 'asc' ? '▲' : '▼') : '↕'}</span>
+        <AppIcon
+          name={active ? (dir === 'asc' ? 'arrow-up' : 'arrow-down') : 'sort'}
+          className={`h-3.5 w-3.5 ${active ? '' : 'text-muted'}`}
+        />
       </button>
     </th>
   );
@@ -296,7 +300,9 @@ function ResultRow({ projectId, row }: { projectId: string; row: TestResultRow }
             >
               {row.name}
             </Link>
-            {expandable && <span className="shrink-0 text-xs text-muted">{open ? '▾' : '▸'}</span>}
+            {expandable && (
+              <AppIcon name={open ? 'chevron-down' : 'chevron-right'} className="h-4 w-4 shrink-0 text-muted" />
+            )}
           </div>
         </td>
         <td className="px-4 py-2 whitespace-nowrap text-muted">{fmtDuration(row.durationMs)}</td>

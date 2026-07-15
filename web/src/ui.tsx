@@ -1,6 +1,18 @@
 import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes } from 'react';
 import { Icon } from '@iconify/react';
 import githubIcon from '@iconify-icons/mdi/github';
+import cogIcon from '@iconify-icons/mdi/cog';
+import chevronDownIcon from '@iconify-icons/mdi/chevron-down';
+import chevronRightIcon from '@iconify-icons/mdi/chevron-right';
+import arrowUpIcon from '@iconify-icons/mdi/arrow-up';
+import arrowDownIcon from '@iconify-icons/mdi/arrow-down';
+import arrowLeftIcon from '@iconify-icons/mdi/arrow-left';
+import arrowRightIcon from '@iconify-icons/mdi/arrow-right';
+import unfoldIcon from '@iconify-icons/mdi/unfold-more-horizontal';
+import checkIcon from '@iconify-icons/mdi/check-bold';
+import closeIcon from '@iconify-icons/mdi/close-thick';
+import alertIcon from '@iconify-icons/mdi/alert';
+import minusCircleIcon from '@iconify-icons/mdi/minus-circle';
 import type { TestStatus } from '@testhistory/shared';
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -83,20 +95,37 @@ export function StatusDot({ status, title }: { status: TestStatus; title?: strin
   return <span title={title ?? status} className={`inline-block h-3 w-3 rounded-sm ${color}`} />;
 }
 
-export function GearIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
+// Central icon registry. Icons are imported as objects from `@iconify-icons/mdi` and
+// passed to `<Icon>` directly, so they are bundled offline (never fetched at runtime).
+// All are monochrome (`currentColor`), so they inherit the surrounding text color.
+const ICON_SET = {
+  github: githubIcon,
+  gear: cogIcon,
+  'chevron-down': chevronDownIcon,
+  'chevron-right': chevronRightIcon,
+  'arrow-up': arrowUpIcon,
+  'arrow-down': arrowDownIcon,
+  'arrow-left': arrowLeftIcon,
+  'arrow-right': arrowRightIcon,
+  sort: unfoldIcon,
+  check: checkIcon,
+  close: closeIcon,
+  alert: alertIcon,
+  'minus-circle': minusCircleIcon,
+};
+
+export type IconName = keyof typeof ICON_SET;
+
+export function AppIcon({ name, className = 'h-4 w-4' }: { name: IconName; className?: string }) {
+  return <Icon icon={ICON_SET[name]} aria-hidden="true" className={`inline-block shrink-0 ${className}`} />;
 }
 
-// GitHub logo via the Iconify React component (`mdi:github`), bundled offline from
-// `@iconify-icons/mdi` so it never hits the Iconify API at runtime. The icon body uses
-// `currentColor`, so it inherits the surrounding text color.
+export function GearIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return <AppIcon name="gear" className={className} />;
+}
+
 export function GitHubIcon({ className = 'h-4 w-4' }: { className?: string }) {
-  return <Icon icon={githubIcon} aria-hidden="true" className={`inline-block shrink-0 ${className}`} />;
+  return <AppIcon name="github" className={className} />;
 }
 
 /** External link to GitHub, prefixed with the GitHub logo. */

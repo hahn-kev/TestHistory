@@ -8,7 +8,7 @@ import {
 } from '@testhistory/shared';
 import { api, ApiError } from '../api/client.js';
 import { useAsync } from '../hooks.js';
-import { Card, ErrorBox, Spinner } from '../ui.js';
+import { AppIcon, Card, ErrorBox, Spinner } from '../ui.js';
 import { getTheme, themeVars } from '../theme/theme.js';
 
 const MAX_IN_FLIGHT = 4;
@@ -81,8 +81,9 @@ export function PluginHostPage() {
   return (
     <div className="space-y-4">
       <div>
-        <Link to={`/projects/${id}/settings`} className="text-sm text-muted hover:text-fg">
-          ← Back to settings
+        <Link to={`/projects/${id}/settings`} className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg">
+          <AppIcon name="arrow-left" className="h-4 w-4" />
+          Back to settings
         </Link>
         <h1 className="mt-1 text-2xl font-semibold text-fg">Plugin</h1>
       </div>

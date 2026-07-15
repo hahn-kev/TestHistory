@@ -2,7 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks.js';
-import { Card, ErrorBox, Spinner, StatusDot, fmtDate, fmtDuration } from '../ui.js';
+import { AppIcon, Card, ErrorBox, Spinner, StatusDot, fmtDate, fmtDuration } from '../ui.js';
 import { themeVars } from '../theme/theme.js';
 
 export function TestDetailPage() {
@@ -23,8 +23,9 @@ export function TestDetailPage() {
   return (
     <div className="space-y-5">
       <div>
-        <Link to={`/projects/${id}`} className="text-sm text-muted hover:text-fg">
-          ← Back to project
+        <Link to={`/projects/${id}`} className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg">
+          <AppIcon name="arrow-left" className="h-4 w-4" />
+          Back to project
         </Link>
         <h1 className="mt-1 text-2xl font-semibold text-fg">{test.name}</h1>
         <p className="text-sm text-muted">{test.suite}</p>

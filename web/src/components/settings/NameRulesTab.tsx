@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { NameRule, NameRulePreviewSample } from '@testhistory/shared';
 import { api, ApiError } from '../../api/client.js';
-import { Button, Card, ErrorBox, Input, Spinner } from '../../ui.js';
+import { AppIcon, Button, Card, ErrorBox, Input, Spinner } from '../../ui.js';
 
 export function NameRulesTab({ projectId }: { projectId: string }) {
   const [rules, setRules] = useState<NameRule[]>([]);
@@ -65,9 +65,13 @@ export function NameRulesTab({ projectId }: { projectId: string }) {
           <div key={i} className="space-y-2 rounded-md border border-border p-2">
             <Input placeholder="match (JS regex)" value={r.match} onChange={(e) => update(i, { match: e.target.value })} />
             <Input placeholder="rewrite" value={r.rewrite} onChange={(e) => update(i, { rewrite: e.target.value })} />
-            <div className="flex gap-1 text-xs">
-              <button className="text-muted hover:text-fg" onClick={() => move(i, -1)}>↑</button>
-              <button className="text-muted hover:text-fg" onClick={() => move(i, 1)}>↓</button>
+            <div className="flex items-center gap-1 text-xs">
+              <button className="text-muted hover:text-fg" onClick={() => move(i, -1)} aria-label="Move up" title="Move up">
+                <AppIcon name="arrow-up" className="h-4 w-4" />
+              </button>
+              <button className="text-muted hover:text-fg" onClick={() => move(i, 1)} aria-label="Move down" title="Move down">
+                <AppIcon name="arrow-down" className="h-4 w-4" />
+              </button>
               <button className="ml-auto text-fail hover:underline" onClick={() => setRules((rs) => rs.filter((_, j) => j !== i))}>
                 Remove
               </button>
