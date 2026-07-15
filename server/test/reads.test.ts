@@ -56,11 +56,12 @@ describe('runs list + detail', () => {
     expect(page2.json().nextCursor).toBe(null);
   });
 
-  test('run detail includes uploads + counts; 404 for missing', async () => {
+  test('run detail includes uploads + counts + suites; 404 for missing', async () => {
     const run = await upload(fx('junit-mixed.xml'));
     const res = await t.app.inject({ method: 'GET', url: `/api/projects/${projectId}/runs/${run.id}`, headers: { cookie: admin } });
     expect(res.json().run.uploads).toHaveLength(1);
     expect(res.json().run.total).toBe(4);
+    expect(res.json().suites).toEqual(['math.AddTest', 'math.DivTest']);
     const missing = await t.app.inject({ method: 'GET', url: `/api/projects/${projectId}/runs/9999`, headers: { cookie: admin } });
     expect(missing.statusCode).toBe(404);
   });
@@ -77,6 +78,37 @@ describe('results listing', () => {
     const search = await t.app.inject({ method: 'GET', url: `/api/projects/${projectId}/runs/${run.id}/results?search=divide`, headers: { cookie: admin } });
     expect(search.json().results.every((r: { name: string }) => /divide/i.test(r.name))).toBe(true);
     expect(search.json().results.length).toBeGreaterThan(0);
+  });
+
+  test('exact suite filter + cursor pagination', async () => {
+    const run = await upload(fx('junit-mixed.xml'));
+
+    const bySuite = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/runs/${run.id}/results?suite=${encodeURIComponent('math.AddTest')}`,
+      headers: { cookie: admin },
+    });
+    const suiteResults = bySuite.json().results;
+    expect(suiteResults).toHaveLength(2);
+    expect(suiteResults.every((r: { suite: string }) => r.suite === 'math.AddTest')).toBe(true);
+
+    const page1 = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/runs/${run.id}/results?limit=2`,
+      headers: { cookie: admin },
+    });
+    expect(page1.json().results).toHaveLength(2);
+    expect(page1.json().nextCursor).toBe(page1.json().results[1].testId);
+
+    const page2 = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/runs/${run.id}/results?limit=2&cursor=${page1.json().nextCursor}`,
+      headers: { cookie: admin },
+    });
+    expect(page2.json().results).toHaveLength(2);
+    expect(page2.json().nextCursor).toBe(null);
+    const allIds = [...page1.json().results, ...page2.json().results].map((r: { testId: number }) => r.testId);
+    expect(new Set(allIds).size).toBe(4);
   });
 });
 

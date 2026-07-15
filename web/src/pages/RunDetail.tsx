@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { TestStatus } from '@testhistory/shared';
-import { api } from '../api/client.js';
+import type { TestResultRow, TestStatus } from '@testhistory/shared';
+import { ApiError, api } from '../api/client.js';
 import { useAsync } from '../hooks.js';
-import { Card, EmptyState, ErrorBox, Input, Spinner, StatusChip, fmtDate, fmtDuration } from '../ui.js';
+import { Button, Card, EmptyState, ErrorBox, Input, Spinner, StatusChip, fmtDate, fmtDuration } from '../ui.js';
 
 const STATUSES: (TestStatus | '')[] = ['', 'passed', 'failed', 'error', 'skipped'];
+const PAGE_SIZE = 50;
+/** Select sentinel for the empty-suite option (HTML cannot distinguish "" from "All suites"). */
+const EMPTY_SUITE = '__empty__';
 
 export function RunDetailPage() {
   const { id = '', runId = '' } = useParams();
@@ -13,15 +16,71 @@ export function RunDetailPage() {
   const run = useAsync(() => api.getRun(id, rid), [id, rid]);
   const [status, setStatus] = useState<TestStatus | ''>('');
   const [search, setSearch] = useState('');
-  const results = useAsync(
-    () => api.listResults(id, rid, { status: status || undefined, search: search || undefined, limit: 200 }),
-    [id, rid, status, search],
-  );
+  /** `undefined` = all suites; `''` = exact empty suite. */
+  const [suite, setSuite] = useState<string | undefined>(undefined);
+
+  const [rows, setRows] = useState<TestResultRow[]>([]);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setRows([]);
+    setNextCursor(null);
+    api
+      .listResults(id, rid, {
+        status: status || undefined,
+        search: search || undefined,
+        suite,
+        limit: PAGE_SIZE,
+      })
+      .then((data) => {
+        if (!cancelled) {
+          setRows(data.results);
+          setNextCursor(data.nextCursor);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof ApiError ? e.message : 'Something went wrong.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, rid, status, search, suite]);
+
+  const loadMore = useCallback(async () => {
+    if (nextCursor == null || loadingMore) return;
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const data = await api.listResults(id, rid, {
+        status: status || undefined,
+        search: search || undefined,
+        suite,
+        cursor: nextCursor,
+        limit: PAGE_SIZE,
+      });
+      setRows((prev) => [...prev, ...data.results]);
+      setNextCursor(data.nextCursor);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Something went wrong.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [id, rid, status, search, suite, nextCursor, loadingMore]);
 
   if (run.loading) return <Spinner />;
   if (run.error) return <ErrorBox message={run.error} />;
   if (!run.data) return null;
   const r = run.data.run;
+  const suites = run.data.suites;
 
   return (
     <div className="space-y-5">
@@ -77,30 +136,56 @@ export function RunDetailPage() {
             </option>
           ))}
         </select>
+        <select
+          value={suite === undefined ? '' : suite === '' ? EMPTY_SUITE : suite}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === '') setSuite(undefined);
+            else if (v === EMPTY_SUITE) setSuite('');
+            else setSuite(v);
+          }}
+          className="rounded-md border border-border bg-surface px-2 py-2 text-sm text-fg"
+        >
+          <option value="">All suites</option>
+          {suites.map((s) => (
+            <option key={s === '' ? EMPTY_SUITE : s} value={s === '' ? EMPTY_SUITE : s}>
+              {s === '' ? '(no suite)' : s}
+            </option>
+          ))}
+        </select>
         <Input placeholder="Search test name…" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
       </div>
 
-      {results.loading && <Spinner />}
-      {results.error && <ErrorBox message={results.error} />}
-      {results.data && results.data.results.length === 0 && <EmptyState title="No matching results" />}
-      {results.data && results.data.results.length > 0 && (
-        <Card className="overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-left text-muted">
-              <tr>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Suite</th>
-                <th className="px-4 py-2">Test</th>
-                <th className="px-4 py-2">Duration</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.data.results.map((row) => (
-                <ResultRow key={row.testId} projectId={id} row={row} />
-              ))}
-            </tbody>
-          </table>
-        </Card>
+      {loading && <Spinner />}
+      {error && <ErrorBox message={error} />}
+      {!loading && !error && rows.length === 0 && <EmptyState title="No matching results" />}
+      {!loading && rows.length > 0 && (
+        <>
+          <Card className="overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-2 text-left text-muted">
+                <tr>
+                  <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2">Suite</th>
+                  <th className="px-4 py-2">Test</th>
+                  <th className="px-4 py-2">Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <ResultRow key={row.testId} projectId={id} row={row} />
+                ))}
+              </tbody>
+            </table>
+          </Card>
+          {nextCursor != null && (
+            <div className="flex justify-center">
+              <Button variant="ghost" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? 'Loading…' : 'Load more'}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -115,7 +200,7 @@ function Meta({ label, value, className = '' }: { label: string; value: string; 
   );
 }
 
-function ResultRow({ projectId, row }: { projectId: string; row: import('@testhistory/shared').TestResultRow }) {
+function ResultRow({ projectId, row }: { projectId: string; row: TestResultRow }) {
   const [open, setOpen] = useState(false);
   const expandable = !!(row.message || row.stack);
   return (

@@ -108,9 +108,12 @@ export const api = {
   // --- reads ---
   listRuns: (id: string, q: { limit?: number; cursor?: number; branch?: string } = {}) =>
     req<{ runs: RunSummary[]; nextCursor: number | null }>('GET', `/api/projects/${id}/runs${qs(q)}`),
-  getRun: (id: string, runId: number) => req<{ run: RunSummary }>('GET', `/api/projects/${id}/runs/${runId}`),
-  listResults: (id: string, runId: number, q: { status?: string; search?: string; cursor?: number; limit?: number } = {}) =>
-    req<{ results: TestResultRow[]; nextCursor: number | null }>('GET', `/api/projects/${id}/runs/${runId}/results${qs(q)}`),
+  getRun: (id: string, runId: number) => req<{ run: RunSummary; suites: string[] }>('GET', `/api/projects/${id}/runs/${runId}`),
+  listResults: (
+    id: string,
+    runId: number,
+    q: { status?: string; search?: string; suite?: string; cursor?: number; limit?: number } = {},
+  ) => req<{ results: TestResultRow[]; nextCursor: number | null }>('GET', `/api/projects/${id}/runs/${runId}/results${qs(q)}`),
   trend: (id: string, q: { limit?: number; branch?: string } = {}) =>
     req<{ trend: TrendPoint[] }>('GET', `/api/projects/${id}/trend${qs(q)}`),
   flaky: (id: string, q: { window?: number; branch?: string } = {}) =>
@@ -137,7 +140,7 @@ export const api = {
 
 function qs(q: Record<string, string | number | undefined>): string {
   const parts = Object.entries(q)
-    .filter(([, v]) => v !== undefined && v !== '')
+    .filter(([, v]) => v !== undefined)
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
   return parts.length ? `?${parts.join('&')}` : '';
 }

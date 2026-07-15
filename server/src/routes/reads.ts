@@ -108,21 +108,34 @@ export async function readRoutes(app: FastifyInstance) {
   // --- Run detail ---
   app.get('/api/projects/:id/runs/:runId', { preHandler: viewer }, async (req, reply) => {
     const runId = Number((req.params as { runId: string }).runId);
-    const row = db(req.project!.id).prepare('SELECT * FROM runs WHERE id = ?').get(runId) as RunRow | undefined;
+    const d = db(req.project!.id);
+    const row = d.prepare('SELECT * FROM runs WHERE id = ?').get(runId) as RunRow | undefined;
     if (!row) return sendError(reply, 404, 'NOT_FOUND', 'Run not found.');
-    return { run: runToSummary(row) };
+    const suites = (
+      d
+        .prepare(
+          `SELECT DISTINCT t.suite AS suite
+             FROM results r JOIN tests t ON t.id = r.test_id
+            WHERE r.run_id = ?
+            ORDER BY t.suite ASC`,
+        )
+        .all(runId) as { suite: string }[]
+    ).map((s) => s.suite);
+    return { run: runToSummary(row), suites };
   });
 
-  // --- Results for a run (status filter, text search, cursor by test_id) ---
+  // --- Results for a run (status / suite filter, text search, cursor by test_id) ---
   app.get('/api/projects/:id/runs/:runId/results', { preHandler: viewer }, async (req) => {
     const runId = Number((req.params as { runId: string }).runId);
-    const q = req.query as Record<string, string>;
+    const q = req.query as Record<string, string | undefined>;
     const limit = clampLimit(q.limit);
     const cursor = numOrNull(q.cursor);
     const statusName = str(q.status) as TestStatus | null;
     const statusCode = statusName && statusName in STATUS_CODE ? STATUS_CODE[statusName] : null;
     const search = str(q.search);
     const like = search ? `%${search}%` : null;
+    // Empty string is a valid suite filter (tests with no suite); omit param = no filter.
+    const suite = q.suite !== undefined ? q.suite : null;
 
     const rows = db(req.project!.id)
       .prepare(
@@ -131,11 +144,12 @@ export async function readRoutes(app: FastifyInstance) {
            FROM results r JOIN tests t ON t.id = r.test_id
           WHERE r.run_id = @runId
             AND (@statusCode IS NULL OR r.status = @statusCode)
+            AND (@suite IS NULL OR t.suite = @suite)
             AND (@like IS NULL OR t.suite LIKE @like OR t.name LIKE @like)
             AND (@cursor IS NULL OR r.test_id > @cursor)
           ORDER BY r.test_id ASC LIMIT @limit`,
       )
-      .all({ runId, statusCode, like, cursor, limit: limit + 1 }) as (Omit<TestResultRow, 'status'> & { statusCode: number })[];
+      .all({ runId, statusCode, suite, like, cursor, limit: limit + 1 }) as (Omit<TestResultRow, 'status'> & { statusCode: number })[];
 
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
