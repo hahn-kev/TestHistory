@@ -1,6 +1,7 @@
 import type {
   UserInfo,
   ProjectInfo,
+  ProjectSizeInfo,
   ProjectMemberInfo,
   TokenInfo,
   RunSummary,
@@ -77,6 +78,9 @@ export const api = {
     req<{ user: UserInfo }>('POST', '/api/admin/users', b),
   updateUser: (id: number, b: Partial<{ displayName: string; role: 'admin' | 'user'; disabled: boolean; password: string }>) =>
     req<{ user: UserInfo }>('PATCH', `/api/admin/users/${id}`, b),
+
+  // --- admin project sizes ---
+  listProjectSizes: () => req<{ projects: ProjectSizeInfo[] }>('GET', '/api/admin/projects'),
 
   // --- projects ---
   listProjects: () => req<{ projects: ProjectInfo[] }>('GET', '/api/projects'),

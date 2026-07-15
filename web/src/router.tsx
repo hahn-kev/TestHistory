@@ -13,6 +13,7 @@ import { ComparePage } from './pages/Compare.js';
 import { SettingsPage } from './pages/Settings.js';
 import { PluginHostPage } from './pages/PluginHostPage.js';
 import { AdminUsersPage } from './pages/AdminUsers.js';
+import { AdminProjectsPage } from './pages/AdminProjects.js';
 
 /** Shell for routes that work signed-in or anonymously (public project deep links). */
 function OptionalAuth() {
@@ -66,7 +67,10 @@ export const router = createBrowserRouter([
       { path: '/projects/:id/settings', element: <SettingsPage /> },
       {
         element: <RequireAdmin />,
-        children: [{ path: '/admin/users', element: <AdminUsersPage /> }],
+        children: [
+          { path: '/admin/users', element: <AdminUsersPage /> },
+          { path: '/admin/projects', element: <AdminProjectsPage /> },
+        ],
       },
     ],
   },
