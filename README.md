@@ -91,12 +91,15 @@ To use it, add a step like this in your workflow:
 | `files` | Multiline glob pattern(s) to match test result files. | **Required** |
 | `on-no-files` | Behavior when no files match the patterns (`error` or `ignore`). | `error` |
 | `run-key` | Unique key identifying this build run. | `${{ github.run_id }}-${{ github.run_attempt }}` |
-| `branch` | The VCS branch name. | `${{ github.ref_name }}` |
-| `commit` | The commit SHA. | `${{ github.sha }}` |
+| `branch` | The VCS branch name. | PR head branch, else `${{ github.ref_name }}` |
+| `commit` | The commit SHA (also the SHA the check run attaches to). | PR head SHA, else `${{ github.sha }}` |
 | `format` | Override parser format (e.g., `junit`, `nunit3`, `xunit`, `trx`). | Auto-detected |
 | `label` | A custom label for this run. | (None) |
 | `ci-url` | Link back to the CI run. | `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}` |
 | `started-at` | ISO 8601 timestamp for the run start. | (Current UTC time) |
+| `create-check` | Create/update a GitHub check run linking to the run on your TestHistory instance. | `true` |
+| `check-name` | Name of the check run. Every upload in the same build updates this one check. | `TestHistory` |
+| `github-token` | Token used for the Checks API (needs `checks: write`). | `${{ github.token }}` |
 
 #### Outputs
 
@@ -108,6 +111,44 @@ To use it, add a step like this in your workflow:
 | `failed` | Number of failing tests. |
 | `errored` | Number of errored tests. |
 | `skipped` | Number of skipped tests. |
+| `check-run-id` | ID of the GitHub check run created/updated (empty if skipped or unavailable). |
+
+#### Run check
+
+By default the action creates a **GitHub check run** on the commit that links to the run
+on your TestHistory instance and shows the pass/fail summary. Because a **run** can be fed
+by several uploads (see run keys above), the check is keyed on the `run-key`: every
+invocation of the action within the same build **updates the one check** rather than
+creating duplicates — so the check always reflects the cumulative run.
+
+For this to work the workflow token needs the `checks: write` permission:
+
+```yaml
+jobs:
+  test:
+    permissions:
+      checks: write # required for the run check; the action falls back to a warning without it
+    steps:
+      # ...
+      - name: Upload Test Results
+        uses: hahn-kev/testhistory/.github/actions/upload-results@latest
+        with:
+          server-url: 'https://testhistory.company.com'
+          project-id: 'your-project-id'
+          api-token: ${{ secrets.TESTHISTORY_TOKEN }}
+          files: '**/junit-*.xml'
+```
+
+Set `create-check: 'false'` to disable it. Note that GitHub issues a read-only token to
+workflows triggered by **forked pull requests**, so the check can't be created there.
+
+**Linking to TestHistory.** GitHub [does not honor a check run's `details_url`](https://github.com/orgs/community/discussions/26757)
+when the check is created with the built-in `GITHUB_TOKEN` — clicking the check row stays
+on GitHub. So the check's **summary** leads with a prominent
+"View this run on TestHistory" link; that's the one-click path to the run. If you'd rather
+have the check itself link straight through, pass a **GitHub App installation token** as
+`github-token` (e.g. via [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token)) —
+GitHub honors `details_url` for App tokens.
 
 ## Comparing runs
 

@@ -28,11 +28,16 @@ inputs:
   branch:
     description: 'The VCS branch name.'
     required: false
-    default: '${{ github.ref_name }}'
+    # On pull_request events github.ref_name is the merge ref (e.g. "3/merge");
+    # github.head_ref is the real source branch. Falls back to ref_name for pushes.
+    default: '${{ github.head_ref || github.ref_name }}'
   commit:
-    description: 'The commit SHA.'
+    description: 'The commit SHA. Also the commit the GitHub check run is attached to.'
     required: false
-    default: '${{ github.sha }}'
+    # On pull_request events github.sha is the synthetic merge commit, which the PR
+    # Checks tab does not display. Use the PR head SHA so the check shows on the PR
+    # (and TestHistory records the real commit). Falls back to github.sha for pushes.
+    default: '${{ github.event.pull_request.head.sha || github.sha }}'
   format:
     description: 'Format override (e.g. junit, nunit2, nunit3, xunit, trx).'
     required: false
@@ -46,6 +51,18 @@ inputs:
   started-at:
     description: 'ISO timestamp for when the run started (defaults to current UTC time if not provided).'
     required: false
+  create-check:
+    description: 'Create/update a GitHub check run linking to the run on the TestHistory server. Requires `checks: write` permission on the workflow token.'
+    required: false
+    default: 'true'
+  check-name:
+    description: 'Name of the GitHub check run. Every invocation in the same build (same run-key) updates the one check with this name.'
+    required: false
+    default: 'TestHistory'
+  github-token:
+    description: 'Token used to create/update the check run. Needs `checks: write`.'
+    required: false
+    default: '${{ github.token }}'
 
 outputs:
   run-id:
@@ -66,6 +83,9 @@ outputs:
   skipped:
     description: 'Number of skipped tests.'
     value: ${{ steps.upload.outputs.skipped }}
+  check-run-id:
+    description: 'The ID of the GitHub check run created or updated (empty if check creation was skipped or failed).'
+    value: ${{ steps.upload.outputs.check-run-id }}
 
 runs:
   using: 'composite'
@@ -85,4 +105,7 @@ runs:
         INPUT_LABEL: ${{ inputs.label }}
         INPUT_CI_URL: ${{ inputs.ci-url }}
         INPUT_STARTED_AT: ${{ inputs.started-at }}
+        INPUT_CREATE_CHECK: ${{ inputs.create-check }}
+        INPUT_CHECK_NAME: ${{ inputs.check-name }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github-token }}
       run: python3 "${{ github.action_path }}/upload.py"
