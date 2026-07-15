@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { TestResultRow, TestStatus } from '@testhistory/shared';
 import { ApiError, api } from '../api/client.js';
 import { useAsync } from '../hooks.js';
-import { Button, Card, EmptyState, ErrorBox, Input, Spinner, StatusChip, fmtDate, fmtDuration } from '../ui.js';
+import { Button, Card, EmptyState, ErrorBox, GitHubLink, Input, Spinner, StatusChip, fmtDate, fmtDuration, githubRunLinks } from '../ui.js';
 
 const STATUSES: (TestStatus | '')[] = ['', 'passed', 'failed', 'error', 'skipped'];
 const PAGE_SIZE = 50;
@@ -101,6 +101,7 @@ export function RunDetailPage() {
   if (!run.data) return null;
   const r = run.data.run;
   const suites = run.data.suites;
+  const gh = githubRunLinks(r);
 
   return (
     <div className="space-y-5">
@@ -120,10 +121,23 @@ export function RunDetailPage() {
       </div>
 
       <Card className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Meta label="Branch" value={r.branch ?? '—'} />
-        <Meta label="Commit" value={r.commitSha ?? '—'} />
+        <Meta
+          label="Branch"
+          value={gh.branch && r.branch ? <GitHubLink href={gh.branch}>{r.branch}</GitHubLink> : r.branch ?? '—'}
+        />
+        <Meta
+          label="Commit"
+          value={
+            gh.commit && r.commitSha ? (
+              <GitHubLink href={gh.commit}>{r.commitSha.slice(0, 7)}</GitHubLink>
+            ) : (
+              r.commitSha ?? '—'
+            )
+          }
+        />
         <Meta label="Started" value={fmtDate(r.startedAt)} />
         <Meta label="Duration" value={fmtDuration(r.durationMs)} />
+        {gh.ci && <Meta label="CI" value={<GitHubLink href={gh.ci}>Actions run</GitHubLink>} />}
         <Meta label="Total" value={String(r.total)} />
         <Meta label="Passed" value={String(r.passed)} className="text-pass" />
         <Meta label="Failed / Error" value={`${r.failed} / ${r.errored}`} className="text-fail" />
@@ -240,7 +254,7 @@ function SortHeader({
   );
 }
 
-function Meta({ label, value, className = '' }: { label: string; value: string; className?: string }) {
+function Meta({ label, value, className = '' }: { label: string; value: ReactNode; className?: string }) {
   return (
     <div>
       <div className="text-xs text-muted">{label}</div>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks.js';
-import { Card, EmptyState, ErrorBox, Spinner, StatusChip, fmtDate, fmtDuration } from '../ui.js';
+import { Card, EmptyState, ErrorBox, GitHubIcon, Spinner, StatusChip, fmtDate, fmtDuration, githubRunLinks } from '../ui.js';
 import { ProjectNav } from '../components/ProjectNav.js';
 import { BranchFilter } from '../components/BranchFilter.js';
 import { TrendChart } from '../components/TrendChart.js';
@@ -50,13 +50,26 @@ export function ProjectOverviewPage() {
               </tr>
             </thead>
             <tbody>
-              {runs.data.runs.map((r) => (
+              {runs.data.runs.map((r) => {
+                const ciUrl = githubRunLinks(r).ci;
+                return (
                 <tr key={r.id} className="border-t border-border hover:bg-surface-2">
                   <td className="px-4 py-2">
                     <Link className="text-primary hover:underline" to={`/projects/${id}/runs/${r.id}`}>
                       #{r.id}
                     </Link>
                     {r.label && <span className="ml-2 text-muted">{r.label}</span>}
+                    {ciUrl && (
+                      <a
+                        href={ciUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="View GitHub Actions run"
+                        className="ml-2 inline-flex align-middle text-muted hover:text-fg"
+                      >
+                        <GitHubIcon />
+                      </a>
+                    )}
                   </td>
                   <td className="px-4 py-2 text-muted">{r.branch ?? '—'}</td>
                   <td className="px-4 py-2">
@@ -69,7 +82,8 @@ export function ProjectOverviewPage() {
                   <td className="px-4 py-2 text-muted">{fmtDuration(r.durationMs)}</td>
                   <td className="px-4 py-2 text-muted">{fmtDate(r.createdAt)}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </Card>
