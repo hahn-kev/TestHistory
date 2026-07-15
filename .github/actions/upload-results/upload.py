@@ -91,11 +91,16 @@ def upsert_check(server_url, project_id, run_id, run_key, commit, counts, starte
 
     details_url = f"{server_url}/projects/{urllib.parse.quote(str(project_id))}/runs/{urllib.parse.quote(str(run_id))}"
     completed_at = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+    # NOTE: GitHub ignores `details_url` for check runs created with the Actions
+    # GITHUB_TOKEN (it only honors it for GitHub App tokens), so the check row/Details
+    # link won't navigate to TestHistory. We therefore lead the summary with a large,
+    # obvious heading link so there's always a one-click path from the check output.
     summary = (
-        f"[View the full run on TestHistory]({details_url})\n\n"
+        f"## ▶️ [View this run on TestHistory]({details_url})\n\n"
         f"| Total | Passed | Failed | Errored | Skipped |\n"
         f"| ---: | ---: | ---: | ---: | ---: |\n"
-        f"| {total} | {passed} | {failed} | {errored} | {skipped} |\n"
+        f"| {total} | {passed} | {failed} | {errored} | {skipped} |\n\n"
+        f"[Open the full run on TestHistory →]({details_url})\n"
     )
     output = {"title": title, "summary": summary}
 

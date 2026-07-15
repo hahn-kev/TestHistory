@@ -142,6 +142,14 @@ jobs:
 Set `create-check: 'false'` to disable it. Note that GitHub issues a read-only token to
 workflows triggered by **forked pull requests**, so the check can't be created there.
 
+**Linking to TestHistory.** GitHub [does not honor a check run's `details_url`](https://github.com/orgs/community/discussions/26757)
+when the check is created with the built-in `GITHUB_TOKEN` — clicking the check row stays
+on GitHub. So the check's **summary** leads with a prominent
+"View this run on TestHistory" link; that's the one-click path to the run. If you'd rather
+have the check itself link straight through, pass a **GitHub App installation token** as
+`github-token` (e.g. via [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token)) —
+GitHub honors `details_url` for App tokens.
+
 ## Comparing runs
 
 The **Compare** tab (and `GET /api/projects/<id>/compare`) diffs two runs and reports what
