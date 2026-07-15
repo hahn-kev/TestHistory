@@ -15,6 +15,9 @@ jobs:
   test:
     name: Build & test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write # let the upload step publish the TestHistory run check
     steps:
       - uses: actions/checkout@v4
 
@@ -34,7 +37,21 @@ jobs:
         run: npm run build
 
       - name: Test
-        run: npm test
+        # Emit JUnit XML alongside the normal console output so we can upload it.
+        # vitest writes the report even when tests fail, so failures still get recorded.
+        run: npm run test -w server -- --reporter=default --reporter=junit --outputFile.junit=test-results/junit.xml
+
+      - name: Upload test results to TestHistory
+        # Run even when tests failed (that's the point) — but skip if the repo
+        # hasn't been configured, e.g. forked PRs with no access to the variables.
+        if: ${{ !cancelled() && vars.TESTHISTORY_PROJECT_ID != '' }}
+        uses: ./.github/actions/upload-results
+        with:
+          server-url: ${{ vars.TESTHISTORY_SERVER_URL }}
+          project-id: ${{ vars.TESTHISTORY_PROJECT_ID }}
+          api-token: ${{ secrets.TESTHISTORY_TOKEN }}
+          files: '**/test-results/junit.xml'
+          on-no-files: ignore
 
   publish:
     name: Publish image to GHCR

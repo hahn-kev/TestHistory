@@ -97,6 +97,9 @@ To use it, add a step like this in your workflow:
 | `label` | A custom label for this run. | (None) |
 | `ci-url` | Link back to the CI run. | `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}` |
 | `started-at` | ISO 8601 timestamp for the run start. | (Current UTC time) |
+| `create-check` | Create/update a GitHub check run linking to the run on your TestHistory instance. | `true` |
+| `check-name` | Name of the check run. Every upload in the same build updates this one check. | `TestHistory` |
+| `github-token` | Token used for the Checks API (needs `checks: write`). | `${{ github.token }}` |
 
 #### Outputs
 
@@ -108,6 +111,36 @@ To use it, add a step like this in your workflow:
 | `failed` | Number of failing tests. |
 | `errored` | Number of errored tests. |
 | `skipped` | Number of skipped tests. |
+| `check-run-id` | ID of the GitHub check run created/updated (empty if skipped or unavailable). |
+
+#### Run check
+
+By default the action creates a **GitHub check run** on the commit that links to the run
+on your TestHistory instance and shows the pass/fail summary. Because a **run** can be fed
+by several uploads (see run keys above), the check is keyed on the `run-key`: every
+invocation of the action within the same build **updates the one check** rather than
+creating duplicates — so the check always reflects the cumulative run.
+
+For this to work the workflow token needs the `checks: write` permission:
+
+```yaml
+jobs:
+  test:
+    permissions:
+      checks: write # required for the run check; the action falls back to a warning without it
+    steps:
+      # ...
+      - name: Upload Test Results
+        uses: hahn-kev/testhistory/.github/actions/upload-results@latest
+        with:
+          server-url: 'https://testhistory.company.com'
+          project-id: 'your-project-id'
+          api-token: ${{ secrets.TESTHISTORY_TOKEN }}
+          files: '**/junit-*.xml'
+```
+
+Set `create-check: 'false'` to disable it. Note that GitHub issues a read-only token to
+workflows triggered by **forked pull requests**, so the check can't be created there.
 
 ## Comparing runs
 
