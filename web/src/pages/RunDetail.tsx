@@ -129,10 +129,17 @@ export function RunDetailPage() {
       </div>
 
       <Card className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Meta
-          label="Branch"
-          value={gh.branch && r.branch ? <GitHubLink href={gh.branch}>{r.branch}</GitHubLink> : r.branch ?? '—'}
-        />
+        {gh.prNumber ? (
+          <Meta
+            label="Pull request"
+            value={gh.pr ? <GitHubLink href={gh.pr}>PR #{gh.prNumber}</GitHubLink> : `PR #${gh.prNumber}`}
+          />
+        ) : (
+          <Meta
+            label="Branch"
+            value={gh.branch && r.branch ? <GitHubLink href={gh.branch}>{r.branch}</GitHubLink> : r.branch ?? '—'}
+          />
+        )}
         <Meta
           label="Commit"
           value={

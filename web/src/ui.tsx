@@ -152,13 +152,23 @@ export function GitHubLink({
 }
 
 /** GitHub URLs derivable from a run. The CI URL (which the upload action defaults to a
- *  GitHub Actions run link) is the source of truth for the repo, so commit/branch links
- *  are only produced when the CI URL is a recognizable Actions run. */
+ *  GitHub Actions run link) is the source of truth for the repo, so commit/branch/PR
+ *  links are only produced when the CI URL is a recognizable Actions run. */
 export interface GitHubRunLinks {
   ci?: string;
   commit?: string;
   branch?: string;
+  /** PR link, when the run's branch is a GitHub pull-request ref (e.g. `3/merge`). */
+  pr?: string;
+  /** PR number parsed from the branch ref, independent of whether the repo is known. */
+  prNumber?: string;
 }
+
+/**
+ * On `pull_request` events GitHub reports the ref as `<n>/merge` (or `<n>/head`) rather
+ * than a real branch, so a `tree/<n>/merge` link 404s. Detect that and link to the PR.
+ */
+const PR_REF = /^(\d+)\/(?:merge|head)$/;
 
 export function githubRunLinks(run: {
   ciUrl: string | null;
@@ -166,6 +176,9 @@ export function githubRunLinks(run: {
   branch: string | null;
 }): GitHubRunLinks {
   const links: GitHubRunLinks = {};
+  const prMatch = run.branch ? PR_REF.exec(run.branch) : null;
+  if (prMatch) links.prNumber = prMatch[1];
+
   if (!run.ciUrl) return links;
   let url: URL;
   try {
@@ -180,7 +193,8 @@ export function githubRunLinks(run: {
   links.ci = run.ciUrl;
   const repo = `${url.origin}/${parts[i - 2]}/${parts[i - 1]}`;
   if (run.commitSha) links.commit = `${repo}/commit/${run.commitSha}`;
-  if (run.branch) links.branch = `${repo}/tree/${encodeURIComponent(run.branch)}`;
+  if (prMatch) links.pr = `${repo}/pull/${prMatch[1]}`;
+  else if (run.branch) links.branch = `${repo}/tree/${encodeURIComponent(run.branch)}`;
   return links;
 }
 
