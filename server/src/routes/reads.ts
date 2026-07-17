@@ -1,6 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import type { Database as Db } from 'better-sqlite3';
-import type { RunSummary, UploadInfo, TestResultRow, TestInfo, TestStatus, RunComparison } from '@testhistory/shared';
+import type {
+  RunSummary,
+  UploadInfo,
+  TestResultRow,
+  TestInfo,
+  TestStatus,
+  RunComparison,
+} from '@testhistory/shared';
+import { parseCiJobOutcome } from '@testhistory/shared';
 import { requireProject } from '../auth/project-access.js';
 import { sendError } from '../auth/guards.js';
 import {
@@ -9,6 +17,7 @@ import {
   getTestHistory,
   compareRuns,
   resolveRunRef,
+  resolvePrimaryBranch,
   type RunRefResolution,
 } from '../analytics/analytics.js';
 import { formatComparisonMarkdown } from '../analytics/compare-format.js';
@@ -24,6 +33,7 @@ interface RunRow {
   branch: string | null;
   commit_sha: string | null;
   ci_url: string | null;
+  ci_job_outcome: string | null;
   uploads_json: string;
   total: number;
   passed: number;
@@ -42,6 +52,7 @@ function runToSummary(row: RunRow): RunSummary {
     branch: row.branch,
     commitSha: row.commit_sha,
     ciUrl: row.ci_url,
+    ciJobOutcome: parseCiJobOutcome(row.ci_job_outcome),
     uploads: JSON.parse(row.uploads_json) as UploadInfo[],
     total: row.total,
     passed: row.passed,
@@ -181,9 +192,37 @@ export async function readRoutes(app: FastifyInstance) {
   });
 
   // --- Trend (analytics) ---
+  // mode=health → Primary Branch only (empty if unresolved; never all-branches fallback).
+  // mode=recent → last N Runs across all branches (unfiltered ledger).
+  // No mode → legacy: optional ?branch= filter (unchanged).
   app.get('/api/projects/:id/trend', { preHandler: viewer }, async (req) => {
     const q = req.query as Record<string, string>;
-    return { trend: computeTrend(db(req.project!.id), { limit: clampLimit(q.limit, 50, 500), branch: str(q.branch) }) };
+    const limit = clampLimit(q.limit, 50, 500);
+    const projectDb = db(req.project!.id);
+    const mode = q.mode === 'health' || q.mode === 'recent' ? q.mode : null;
+
+    if (mode === 'health') {
+      const primaryBranch = req.project!.primary_branch?.trim() || null;
+      const resolvedPrimaryBranch = resolvePrimaryBranch(projectDb, {
+        override: primaryBranch,
+        limit,
+      });
+      if (!resolvedPrimaryBranch) {
+        return { trend: [], mode, primaryBranch, resolvedPrimaryBranch: null };
+      }
+      return {
+        trend: computeTrend(projectDb, { limit, branch: resolvedPrimaryBranch }),
+        mode,
+        primaryBranch,
+        resolvedPrimaryBranch,
+      };
+    }
+
+    if (mode === 'recent') {
+      return { trend: computeTrend(projectDb, { limit }), mode };
+    }
+
+    return { trend: computeTrend(projectDb, { limit, branch: str(q.branch) }) };
   });
 
   // --- Flaky (analytics) ---

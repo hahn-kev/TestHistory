@@ -8,6 +8,8 @@ export interface ProjectRow {
   name: string;
   description: string | null;
   private: number;
+  /** Optional Primary Branch override; null means auto-detect. */
+  primary_branch: string | null;
   created_by: number | null;
   created_at: string;
 }

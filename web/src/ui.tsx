@@ -13,7 +13,7 @@ import checkIcon from '@iconify-icons/mdi/check-bold';
 import closeIcon from '@iconify-icons/mdi/close-thick';
 import alertIcon from '@iconify-icons/mdi/alert';
 import minusCircleIcon from '@iconify-icons/mdi/minus-circle';
-import type { TestStatus } from '@testhistory/shared';
+import type { CiJobOutcome, TestStatus } from '@testhistory/shared';
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
@@ -86,6 +86,24 @@ export function StatusChip({ status }: { status: TestStatus }) {
   return (
     <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold capitalize ${STATUS_STYLE[status]}`}>
       {status}
+    </span>
+  );
+}
+
+const CI_JOB_OUTCOME_STYLE: Record<CiJobOutcome, string> = {
+  failed: 'bg-fail/15 text-fail',
+  cancelled: 'bg-skip/15 text-skip',
+};
+
+/** Badge for sticky CI Job Outcome — only renders for failed / cancelled. */
+export function CiJobOutcomeBadge({ outcome }: { outcome: CiJobOutcome | null | undefined }) {
+  if (outcome !== 'failed' && outcome !== 'cancelled') return null;
+  return (
+    <span
+      className={`inline-block rounded px-2 py-0.5 text-xs font-semibold capitalize ${CI_JOB_OUTCOME_STYLE[outcome]}`}
+      title="CI Job Outcome"
+    >
+      {outcome}
     </span>
   );
 }

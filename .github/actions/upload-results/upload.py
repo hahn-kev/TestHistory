@@ -12,6 +12,36 @@ import json
 import shutil
 
 
+def resolve_ci_job_outcome(explicit, job_status):
+    """Map Action input / job.status to API `ci_job_outcome`, or None to omit.
+
+    Domain: CI Job Outcome (`failed` | `cancelled`). Success and unknown values
+    are omitted so we never send a success outcome. Explicit `failed`/`cancelled`
+    win; GitHub's `failure` spelling is accepted as `failed`. When the input is
+    empty, map `job.status`: cancelled→cancelled, failure→failed, else omit.
+    """
+    e = (explicit or "").strip().lower()
+    if e in ("failed", "cancelled"):
+        return e
+    if e == "failure":
+        return "failed"
+    if e in ("success",):
+        return None
+    if e:
+        print(
+            f"::warning::Ignoring unrecognized ci-job-outcome '{explicit}'. "
+            "Use failed or cancelled (or leave empty to map from job.status)."
+        )
+        return None
+
+    s = (job_status or "").strip().lower()
+    if s == "cancelled":
+        return "cancelled"
+    if s == "failure":
+        return "failed"
+    return None
+
+
 def _gh_api(method, url, token, body=None):
     """Call the GitHub REST API. Returns (status_code, parsed_json_or_None).
 
@@ -175,6 +205,10 @@ def main():
     label = os.environ.get("INPUT_LABEL", "")
     ci_url = os.environ.get("INPUT_CI_URL", "")
     started_at = os.environ.get("INPUT_STARTED_AT", "")
+    ci_job_outcome = resolve_ci_job_outcome(
+        os.environ.get("INPUT_CI_JOB_OUTCOME", ""),
+        os.environ.get("JOB_STATUS", ""),
+    )
 
     # Validate required fields
     if not server_url:
@@ -254,7 +288,8 @@ def main():
         "commit": commit,
         "label": label,
         "ci_url": ci_url,
-        "started_at": started_at
+        "started_at": started_at,
+        "ci_job_outcome": ci_job_outcome or "",
     }
     for name, value in fields.items():
         if value:

@@ -1,4 +1,4 @@
-import type { ResultFormat, RunSummary } from '@testhistory/shared';
+import type { CiJobOutcome, ResultFormat, RunSummary } from '@testhistory/shared';
 import type { NameRule } from './names.js';
 
 /** One file handed to the ingest worker (already streamed to a temp path). */
@@ -17,6 +17,8 @@ export interface IngestMeta {
   label: string | null;
   ciUrl: string | null;
   startedAt: string | null;
+  /** Optional CI Job Outcome from this Upload; omit/null = no change on append. */
+  ciJobOutcome?: CiJobOutcome | null;
 }
 
 export interface IngestPayload {

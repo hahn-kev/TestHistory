@@ -11,6 +11,7 @@ import {
   resolveAppendTarget,
   compareRuns,
   resolveRunRef,
+  resolvePrimaryBranch,
 } from '../src/analytics/analytics.js';
 import { formatComparisonMarkdown, COMPARE_MARKER } from '../src/analytics/compare-format.js';
 import type { TestStatus, RunSummary } from '@testhistory/shared';
@@ -359,11 +360,80 @@ describe('compareRuns — classification matrix', () => {
   });
 });
 
+describe('resolvePrimaryBranch', () => {
+  test('non-empty override always wins over auto-detect', () => {
+    addRun(1, { branch: 'main' });
+    addRun(2, { branch: 'main' });
+    expect(resolvePrimaryBranch(db, { override: 'develop' })).toBe('develop');
+    expect(resolvePrimaryBranch(db, { override: '  release  ' })).toBe('release');
+  });
+
+  test('empty / whitespace / null override falls through to auto-detect', () => {
+    addRun(1, { branch: 'main' });
+    expect(resolvePrimaryBranch(db, { override: null })).toBe('main');
+    expect(resolvePrimaryBranch(db, { override: '' })).toBe('main');
+    expect(resolvePrimaryBranch(db, { override: '   ' })).toBe('main');
+    expect(resolvePrimaryBranch(db, {})).toBe('main');
+  });
+
+  test('prefers main, then master, then develop when present in lookback', () => {
+    addRun(1, { branch: 'develop' });
+    addRun(2, { branch: 'master' });
+    addRun(3, { branch: 'feature' });
+    expect(resolvePrimaryBranch(db, {})).toBe('master'); // master before develop
+
+    addRun(4, { branch: 'main' });
+    expect(resolvePrimaryBranch(db, {})).toBe('main'); // main wins over master/develop
+  });
+
+  test('frequency fallback excludes */merge PR refs', () => {
+    addRun(1, { branch: 'feature-a' });
+    addRun(2, { branch: 'refs/pull/7/merge' });
+    addRun(3, { branch: 'refs/pull/8/merge' });
+    addRun(4, { branch: 'refs/pull/9/merge' });
+    addRun(5, { branch: 'feature-a' });
+    expect(resolvePrimaryBranch(db, {})).toBe('feature-a');
+  });
+
+  test('most frequent non-PR branch wins when no conventional name', () => {
+    addRun(1, { branch: 'alpha' });
+    addRun(2, { branch: 'beta' });
+    addRun(3, { branch: 'beta' });
+    addRun(4, { branch: 'alpha' });
+    addRun(5, { branch: 'beta' });
+    expect(resolvePrimaryBranch(db, {})).toBe('beta');
+  });
+
+  test('lookback limit matches health chart — older runs outside the window are ignored', () => {
+    // Oldest (id 1) is develop; newest 2 are feature → with limit 2, no conventional name
+    addRun(1, { branch: 'develop' });
+    addRun(2, { branch: 'feature' });
+    addRun(3, { branch: 'feature' });
+    expect(resolvePrimaryBranch(db, { limit: 2 })).toBe('feature');
+    expect(resolvePrimaryBranch(db, { limit: 50 })).toBe('develop');
+  });
+
+  test('unresolved when lookback is empty or only PR merge refs', () => {
+    expect(resolvePrimaryBranch(db, {})).toBeNull();
+    addRun(1, { branch: 'refs/pull/1/merge' });
+    addRun(2, { branch: 'refs/pull/2/merge' });
+    expect(resolvePrimaryBranch(db, {})).toBeNull();
+  });
+
+  test('null / empty branch rows do not count toward detection', () => {
+    addRun(1, { branch: undefined });
+    addRun(2); // defaults to null
+    expect(resolvePrimaryBranch(db, {})).toBeNull();
+    addRun(3, { branch: 'main' });
+    expect(resolvePrimaryBranch(db, {})).toBe('main');
+  });
+});
+
 describe('formatComparisonMarkdown', () => {
   function comparison(overrides: Partial<RunSummary> = {}): Parameters<typeof formatComparisonMarkdown>[0] {
     const base: RunSummary = {
       id: 1, createdAt: '2026-01-01T00:00:00Z', startedAt: null, durationMs: 1000,
-      label: null, branch: 'main', commitSha: 'abcdef1234', ciUrl: null, uploads: [],
+      label: null, branch: 'main', commitSha: 'abcdef1234', ciUrl: null, ciJobOutcome: null, uploads: [],
       total: 3, passed: 3, failed: 0, errored: 0, skipped: 0,
     };
     const head: RunSummary = { ...base, id: 2, branch: 'pr', durationMs: 1500, passed: 2, failed: 1, ...overrides };

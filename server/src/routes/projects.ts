@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { Database as Db } from 'better-sqlite3';
 import { z } from 'zod';
 import { requireUser, sendError } from '../auth/guards.js';
 import { requireProject, computeAccess, type ProjectRow } from '../auth/project-access.js';
@@ -7,6 +8,7 @@ import { pluginsDir } from '../config.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ProjectInfo, ProjectRole } from '@testhistory/shared';
+import { resolvePrimaryBranch } from '../analytics/analytics.js';
 
 const createBody = z.object({
   name: z.string().min(1).max(120),
@@ -18,9 +20,17 @@ const patchBody = z.object({
   name: z.string().min(1).max(120).optional(),
   description: z.string().max(2000).nullable().optional(),
   private: z.boolean().optional(),
+  /** Primary Branch override; null or empty string clears (restores auto-detect). */
+  primaryBranch: z.string().max(200).nullable().optional(),
 });
 
-function toProjectInfo(row: ProjectRow, myRole: ProjectRole | null): ProjectInfo {
+function toProjectInfo(
+  row: ProjectRow,
+  myRole: ProjectRole | null,
+  /** When set, resolve Primary Branch against this Project DB; list endpoints pass null. */
+  projectDb: Db | null,
+): ProjectInfo {
+  const override = row.primary_branch?.trim() || null;
   return {
     id: row.id,
     name: row.name,
@@ -28,6 +38,8 @@ function toProjectInfo(row: ProjectRow, myRole: ProjectRole | null): ProjectInfo
     private: !!row.private,
     createdAt: row.created_at,
     myRole,
+    primaryBranch: override,
+    resolvedPrimaryBranch: projectDb ? resolvePrimaryBranch(projectDb, { override }) : null,
   };
 }
 
@@ -57,7 +69,8 @@ export async function projectRoutes(app: FastifyInstance) {
       }[]).map((m) => [m.project_id, m.role]),
     );
     return {
-      projects: rows.map((r) => toProjectInfo(r, memberships.get(r.id) ?? null)),
+      // List skips Primary Branch resolution (would open every Project DB); detail/PATCH resolve.
+      projects: rows.map((r) => toProjectInfo(r, memberships.get(r.id) ?? null, null)),
     };
   });
 
@@ -85,13 +98,15 @@ export async function projectRoutes(app: FastifyInstance) {
     });
     tx();
     // Materialize the per-project DB immediately so its schema exists.
-    app.dbManager.get(id);
+    const projectDb = app.dbManager.get(id);
     const row = core.prepare('SELECT * FROM projects WHERE id = ?').get(id) as ProjectRow;
-    return reply.code(201).send({ project: toProjectInfo(row, 'owner') });
+    return reply.code(201).send({ project: toProjectInfo(row, 'owner', projectDb) });
   });
 
   app.get('/api/projects/:id', { preHandler: requireProject(core, 'viewer') }, async (req) => {
-    return { project: toProjectInfo(req.project!, req.projectRole ?? null) };
+    return {
+      project: toProjectInfo(req.project!, req.projectRole ?? null, app.dbManager.get(req.project!.id)),
+    };
   });
 
   app.patch('/api/projects/:id', { preHandler: requireProject(core, 'owner') }, async (req, reply) => {
@@ -100,7 +115,7 @@ export async function projectRoutes(app: FastifyInstance) {
       return sendError(reply, 400, 'VALIDATION', parsed.error.issues[0]?.message ?? 'Invalid input.');
     }
     const p = req.project!;
-    const { name, description, private: priv } = parsed.data;
+    const { name, description, private: priv, primaryBranch } = parsed.data;
     if (name !== undefined && name !== p.name) {
       const clash = core.prepare('SELECT id FROM projects WHERE name = ? AND id != ?').get(name, p.id);
       if (clash) return sendError(reply, 409, 'NAME_TAKEN', 'A project with that name already exists.');
@@ -110,9 +125,13 @@ export async function projectRoutes(app: FastifyInstance) {
       core.prepare('UPDATE projects SET description = ? WHERE id = ?').run(description, p.id);
     if (priv !== undefined)
       core.prepare('UPDATE projects SET private = ? WHERE id = ?').run(priv ? 1 : 0, p.id);
+    if (primaryBranch !== undefined) {
+      const stored = primaryBranch?.trim() || null;
+      core.prepare('UPDATE projects SET primary_branch = ? WHERE id = ?').run(stored, p.id);
+    }
 
     const row = core.prepare('SELECT * FROM projects WHERE id = ?').get(p.id) as ProjectRow;
-    return { project: toProjectInfo(row, req.projectRole ?? null) };
+    return { project: toProjectInfo(row, req.projectRole ?? null, app.dbManager.get(p.id)) };
   });
 
   app.delete('/api/projects/:id', { preHandler: requireProject(core, 'owner') }, async (req) => {

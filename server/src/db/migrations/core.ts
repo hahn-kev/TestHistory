@@ -73,4 +73,12 @@ export const coreMigrations: Migration[] = [
       CREATE INDEX idx_plugins_project ON plugins(project_id);
     `,
   },
+  {
+    version: 3,
+    sql: `
+      -- Optional Primary Branch override for health-trend scoping (ADR-0003).
+      -- NULL / empty means live auto-detect from recent Runs.
+      ALTER TABLE projects ADD COLUMN primary_branch TEXT;
+    `,
+  },
 ];

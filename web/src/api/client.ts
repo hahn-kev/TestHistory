@@ -9,7 +9,8 @@ import type {
   TestInfo,
   TestHistoryEntry,
   FlakyTestEntry,
-  TrendPoint,
+  TrendResponse,
+  TrendMode,
   PluginInfo,
   PluginQueryResult,
   NameRule,
@@ -87,8 +88,10 @@ export const api = {
   createProject: (b: { name: string; description?: string; private?: boolean }) =>
     req<{ project: ProjectInfo }>('POST', '/api/projects', b),
   getProject: (id: string) => req<{ project: ProjectInfo }>('GET', `/api/projects/${id}`),
-  updateProject: (id: string, b: Partial<{ name: string; description: string | null; private: boolean }>) =>
-    req<{ project: ProjectInfo }>('PATCH', `/api/projects/${id}`, b),
+  updateProject: (
+    id: string,
+    b: Partial<{ name: string; description: string | null; private: boolean; primaryBranch: string | null }>,
+  ) => req<{ project: ProjectInfo }>('PATCH', `/api/projects/${id}`, b),
   deleteProject: (id: string) => req<{ ok: true }>('DELETE', `/api/projects/${id}`),
 
   // --- members ---
@@ -118,8 +121,8 @@ export const api = {
     runId: number,
     q: { status?: string; search?: string; suite?: string; sort?: string; dir?: string; cursor?: number; limit?: number } = {},
   ) => req<{ results: TestResultRow[]; nextCursor: number | null }>('GET', `/api/projects/${id}/runs/${runId}/results${qs(q)}`),
-  trend: (id: string, q: { limit?: number; branch?: string } = {}) =>
-    req<{ trend: TrendPoint[] }>('GET', `/api/projects/${id}/trend${qs(q)}`),
+  trend: (id: string, q: { limit?: number; branch?: string; mode?: TrendMode } = {}) =>
+    req<TrendResponse>('GET', `/api/projects/${id}/trend${qs(q)}`),
   flaky: (id: string, q: { window?: number; branch?: string } = {}) =>
     req<{ flaky: FlakyTestEntry[] }>('GET', `/api/projects/${id}/flaky${qs(q)}`),
   searchTests: (id: string, q: { search?: string; cursor?: number; limit?: number } = {}) =>

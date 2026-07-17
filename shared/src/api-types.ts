@@ -4,6 +4,13 @@ export type Role = 'admin' | 'user';
 export type ProjectRole = 'owner' | 'member';
 export type TestStatus = 'passed' | 'failed' | 'error' | 'skipped';
 export type ResultFormat = 'junit' | 'nunit2' | 'nunit3' | 'xunit' | 'trx';
+/** Best-effort CI job fate reported at Upload (`CONTEXT.md` — CI Job Outcome). */
+export type CiJobOutcome = 'failed' | 'cancelled';
+
+/** Parse upload/DB strings into CI Job Outcome; anything else → null. */
+export function parseCiJobOutcome(v: string | null | undefined): CiJobOutcome | null {
+  return v === 'failed' || v === 'cancelled' ? v : null;
+}
 
 export interface ApiError {
   error: { code: string; message: string };
@@ -25,6 +32,10 @@ export interface ProjectInfo {
   private: boolean;
   createdAt: string;
   myRole: ProjectRole | null;
+  /** Optional Primary Branch override; null/empty means auto-detect. */
+  primaryBranch: string | null;
+  /** Resolved Primary Branch after override or auto-detect; null if unresolved. */
+  resolvedPrimaryBranch: string | null;
   lastRun?: RunSummary | null;
 }
 
@@ -80,6 +91,8 @@ export interface RunSummary {
   branch: string | null;
   commitSha: string | null;
   ciUrl: string | null;
+  /** Sticky CI Job Outcome; null when unset. */
+  ciJobOutcome: CiJobOutcome | null;
   uploads: UploadInfo[];
   total: number;
   passed: number;
@@ -139,6 +152,19 @@ export interface TrendPoint {
   errored: number;
   skipped: number;
   durationMs: number | null;
+}
+
+/** `GET /trend` mode: health = Primary Branch; recent = unfiltered last N. */
+export type TrendMode = 'health' | 'recent';
+
+/** Response for `GET /api/projects/:id/trend` (mode fields present when `?mode=` is set). */
+export interface TrendResponse {
+  trend: TrendPoint[];
+  mode?: TrendMode;
+  /** Primary Branch override (health mode only). */
+  primaryBranch?: string | null;
+  /** Resolved Primary Branch after override/auto-detect (health mode only; null if unresolved). */
+  resolvedPrimaryBranch?: string | null;
 }
 
 export interface NameRule {
