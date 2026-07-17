@@ -1,9 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import type { ChangeCategory, ComparedStatus, ComparedTest, RunComparison } from '@testhistory/shared';
+import type { ChangeCategory, ComparedStatus, ComparedTest, RunComparison, RunSummary } from '@testhistory/shared';
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks.js';
-import { AppIcon, Button, Card, EmptyState, ErrorBox, Field, Input, Spinner, fmtDate, fmtDuration } from '../ui.js';
+import {
+  AppIcon,
+  Button,
+  Card,
+  EmptyState,
+  ErrorBox,
+  Field,
+  Input,
+  Spinner,
+  branchLabel,
+  fmtDate,
+  fmtDuration,
+  isPrBranchRef,
+} from '../ui.js';
 import { ProjectNav } from '../components/ProjectNav.js';
 
 const CATEGORY_META: { key: ChangeCategory; label: string; tone: string }[] = [
@@ -13,6 +26,9 @@ const CATEGORY_META: { key: ChangeCategory; label: string; tone: string }[] = [
   { key: 'newTests', label: 'New tests', tone: 'text-fg' },
   { key: 'removedTests', label: 'Removed tests', tone: 'text-muted' },
 ];
+
+const SELECT_CLASS =
+  'w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg outline-none focus:border-primary';
 
 /** A chip that also renders the `absent` pseudo-status (StatusChip only knows the 4 real ones). */
 function CompareChip({ status }: { status: ComparedStatus }) {
@@ -33,16 +49,85 @@ function sign(n: number): string {
   return n > 0 ? `+${n}` : String(n);
 }
 
+function runOptionLabel(run: RunSummary): string {
+  const parts = [`#${run.id}`];
+  if (run.label) parts.push(run.label);
+  const bl = branchLabel(run.branch);
+  if (bl) parts.push(bl);
+  parts.push(`${run.passed}/${run.total}`);
+  return parts.join(' · ');
+}
+
+/**
+ * Among non-PR branches in recent runs, pick the most frequent; tie-break prefer
+ * develop → main → master → first seen.
+ */
+export function inferDefaultBaseBranch(runs: { branch: string | null }[]): string | null {
+  const counts = new Map<string, number>();
+  const order: string[] = [];
+  for (const r of runs) {
+    const b = r.branch;
+    if (!b || isPrBranchRef(b)) continue;
+    if (!counts.has(b)) order.push(b);
+    counts.set(b, (counts.get(b) ?? 0) + 1);
+  }
+  if (order.length === 0) return null;
+  const preferred = ['develop', 'main', 'master'];
+  return order.slice().sort((a, b) => {
+    const freqDiff = counts.get(b)! - counts.get(a)!;
+    if (freqDiff !== 0) return freqDiff;
+    const ai = preferred.indexOf(a);
+    const bi = preferred.indexOf(b);
+    const ap = ai === -1 ? 99 : ai;
+    const bp = bi === -1 ? 99 : bi;
+    if (ap !== bp) return ap - bp;
+    return order.indexOf(a) - order.indexOf(b);
+  })[0];
+}
+
+function distinctBranches(runs: RunSummary[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of runs) {
+    if (!r.branch || seen.has(r.branch)) continue;
+    seen.add(r.branch);
+    out.push(r.branch);
+  }
+  return out;
+}
+
 export function ComparePage() {
   const { id = '' } = useParams();
   const [params, setParams] = useSearchParams();
   const project = useAsync(() => api.getProject(id), [id]);
+  const recent = useAsync(() => api.listRuns(id, { limit: 30 }), [id]);
 
   // Draft picker state, seeded from the URL so a comparison is deep-linkable.
   const [base, setBase] = useState(params.get('base') ?? '');
   const [baseBranch, setBaseBranch] = useState(params.get('baseBranch') ?? '');
   const [head, setHead] = useState(params.get('head') ?? '');
   const [headBranch, setHeadBranch] = useState(params.get('headBranch') ?? '');
+
+  // Keep drafts aligned when navigating between compare URLs (e.g. another run's Compare…).
+  useEffect(() => {
+    setBase(params.get('base') ?? '');
+    setBaseBranch(params.get('baseBranch') ?? '');
+    setHead(params.get('head') ?? '');
+    setHeadBranch(params.get('headBranch') ?? '');
+  }, [params]);
+
+  // Run Detail links with only ?head= — infer a base branch and auto-commit so compare loads.
+  useEffect(() => {
+    if (!recent.data) return;
+    const hasBase = !!(params.get('base') || params.get('baseBranch'));
+    const hasHead = !!(params.get('head') || params.get('headBranch'));
+    if (!hasHead || hasBase) return;
+    const inferred = inferDefaultBaseBranch(recent.data.runs);
+    if (!inferred) return;
+    const next = new URLSearchParams(params);
+    next.set('baseBranch', inferred);
+    setParams(next, { replace: true });
+  }, [recent.data, params, setParams]);
 
   const q = {
     base: params.get('base') ? Number(params.get('base')) : undefined,
@@ -59,12 +144,17 @@ export function ComparePage() {
     [id, q.base, q.head, q.baseBranch, q.headBranch],
   );
 
-  function run() {
+  const runs = recent.data?.runs ?? [];
+  const branches = useMemo(() => distinctBranches(runs), [runs]);
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
     const next: Record<string, string> = {};
     if (base) next.base = base;
     else if (baseBranch) next.baseBranch = baseBranch;
     if (head) next.head = head;
     else if (headBranch) next.headBranch = headBranch;
+    if (Object.keys(next).length === 0) return;
     setParams(next);
   }
 
@@ -72,21 +162,48 @@ export function ComparePage() {
   if (project.error) return <ErrorBox message={project.error} />;
   if (!project.data) return null;
 
+  const canSubmit = !!(base || baseBranch) && !!(head || headBranch);
+
   return (
     <div className="space-y-6">
       <ProjectNav project={project.data.project} />
 
-      <Card className="grid gap-4 p-4 sm:grid-cols-2">
-        <Picker title="Base" idValue={base} onId={setBase} branchValue={baseBranch} onBranch={setBaseBranch} />
-        <Picker title="Head" idValue={head} onId={setHead} branchValue={headBranch} onBranch={setHeadBranch} />
-        <div className="sm:col-span-2">
-          <Button onClick={run} disabled={!(base || baseBranch) || !(head || headBranch)}>
-            Compare
-          </Button>
-        </div>
+      <Card className="p-4">
+        <form className="grid gap-4 sm:grid-cols-2" onSubmit={onSubmit}>
+          <Picker
+            title="Base"
+            idValue={base}
+            onId={setBase}
+            branchValue={baseBranch}
+            onBranch={setBaseBranch}
+            runs={runs}
+            branches={branches}
+            listLoading={recent.loading}
+          />
+          <Picker
+            title="Head"
+            idValue={head}
+            onId={setHead}
+            branchValue={headBranch}
+            onBranch={setHeadBranch}
+            runs={runs}
+            branches={branches}
+            listLoading={recent.loading}
+          />
+          <div className="sm:col-span-2">
+            <Button type="submit" disabled={!canSubmit}>
+              Compare
+            </Button>
+          </div>
+        </form>
       </Card>
 
-      {!ready && <EmptyState title="Pick two runs" hint="Choose a base and head run — by run id, or the latest run on a branch." />}
+      {!ready && (
+        <EmptyState
+          title="Pick two runs"
+          hint="Choose a base and head from recent runs, or the latest run on a branch."
+        />
+      )}
       {ready && cmp.loading && <Spinner />}
       {ready && cmp.error && <ErrorBox message={cmp.error} />}
       {ready && cmp.data && <Comparison projectId={id} data={cmp.data.comparison} />}
@@ -100,21 +217,63 @@ function Picker({
   onId,
   branchValue,
   onBranch,
+  runs,
+  branches,
+  listLoading,
 }: {
   title: string;
   idValue: string;
   onId: (v: string) => void;
   branchValue: string;
   onBranch: (v: string) => void;
+  runs: RunSummary[];
+  branches: string[];
+  listLoading: boolean;
 }) {
+  const listId = useId();
+  const knownIds = new Set(runs.map((r) => String(r.id)));
+  const orphanId = idValue && !knownIds.has(idValue) ? idValue : null;
+
   return (
     <div className="space-y-2">
       <p className="text-sm font-semibold text-fg">{title}</p>
-      <Field label="Run id">
-        <Input inputMode="numeric" placeholder="e.g. 42" value={idValue} onChange={(e) => onId(e.target.value)} />
+      <Field label="Run">
+        <select
+          className={SELECT_CLASS}
+          value={idValue}
+          disabled={listLoading && runs.length === 0}
+          onChange={(e) => {
+            const v = e.target.value;
+            onId(v);
+            if (v) onBranch('');
+          }}
+        >
+          <option value="">{listLoading && runs.length === 0 ? 'Loading runs…' : 'Select a run…'}</option>
+          {orphanId && <option value={orphanId}>#{orphanId}</option>}
+          {runs.map((r) => (
+            <option key={r.id} value={String(r.id)}>
+              {runOptionLabel(r)}
+            </option>
+          ))}
+        </select>
       </Field>
       <Field label="…or latest on branch">
-        <Input placeholder="e.g. main" value={branchValue} onChange={(e) => onBranch(e.target.value)} disabled={!!idValue} />
+        <Input
+          list={listId}
+          placeholder="e.g. develop"
+          value={branchValue}
+          disabled={!!idValue}
+          onChange={(e) => {
+            const v = e.target.value;
+            onBranch(v);
+            if (v) onId('');
+          }}
+        />
+        <datalist id={listId}>
+          {branches.map((b) => (
+            <option key={b} value={b} label={branchLabel(b) || b} />
+          ))}
+        </datalist>
       </Field>
     </div>
   );
@@ -218,10 +377,11 @@ function CategoryTable({ projectId, tests }: { projectId: string; tests: Compare
 }
 
 function RunRef({ label, projectId, run }: { label: string; projectId: string; run: RunComparison['base'] }) {
+  const bl = branchLabel(run.branch);
   return (
     <Link to={`/projects/${projectId}/runs/${run.id}`} className="text-primary hover:underline" title={fmtDate(run.createdAt)}>
       {label} #{run.id}
-      {run.branch ? ` (${run.branch})` : ''}
+      {bl ? ` (${bl})` : ''}
     </Link>
   );
 }
