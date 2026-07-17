@@ -24,6 +24,10 @@ Glossary of domain terms. Terms here are canonical: code, API, UI, and docs use 
 
 - **Flaky Test** — a Test whose Status flipped between passing and not-passing at least twice within a recent window of Runs. A flip is only meaningful within a single branch's sequence of Runs; the cross-branch view is a convenience, not the definition. A flip is a transition between `passed` and (`failed` | `error`); `skipped` Results and Runs in which the Test did not appear are gaps, not flips.
 
+- **Primary Branch** — the branch a Project treats as the mainline for **health** trend. Optional owner/member override on the Project; when unset, inferred from recent Runs (`main`, then `master`, then `develop` if present; otherwise the most frequent non-PR branch). Used only to scope the health series — not a filter on flaky detection or the recent-Runs ledger.
+
+- **CI Job Outcome** — best-effort record on a Run of the uploading CI **job's** fate as reported at Upload time: `failed`, `cancelled`, or unset. Sticky once set to a trouble outcome. Reflects the job that performed the Upload, not the full CI workflow; absence does not mean the Build succeeded.
+
 ## Access & extension
 
 - **Member** — a user attached to a Project, with role `owner` or `member`. Membership governs *managing* a Project; *reading* is governed by the Project's visibility. A `member` handles day-to-day data (uploading and deleting Runs, tokens, plugins); an `owner` additionally controls the Project's identity and existence (rename, visibility, membership, deletion). Admins implicitly have owner powers on every Project.

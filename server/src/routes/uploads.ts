@@ -6,6 +6,7 @@ import { bearerFrom, resolveToken } from '../auth/tokens.js';
 import { detect } from '../ingest/detect.js';
 import { tmpDir } from '../config.js';
 import { streamToTempFile } from '../lib/stream-to-file.js';
+import { parseCiJobOutcome } from '@testhistory/shared';
 import type { IngestFile, IngestMeta } from '../ingest/types.js';
 import { nowIso } from '../lib/ids.js';
 
@@ -192,6 +193,7 @@ export async function uploadRoutes(app: FastifyInstance) {
         label: pick('label', 'label'),
         ciUrl: pick('ci_url', 'ci_url'),
         startedAt: pick('started_at', 'started_at'),
+        ciJobOutcome: parseCiJobOutcome(pick('ci_job_outcome', 'ci_job_outcome')),
       };
 
       // Ensure the project DB is materialized/migrated, then dispatch.

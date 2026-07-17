@@ -1,6 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import type { Database as Db } from 'better-sqlite3';
-import type { RunSummary, UploadInfo, TestResultRow, TestInfo, TestStatus, RunComparison } from '@testhistory/shared';
+import type {
+  RunSummary,
+  UploadInfo,
+  TestResultRow,
+  TestInfo,
+  TestStatus,
+  RunComparison,
+} from '@testhistory/shared';
+import { parseCiJobOutcome } from '@testhistory/shared';
 import { requireProject } from '../auth/project-access.js';
 import { sendError } from '../auth/guards.js';
 import {
@@ -24,6 +32,7 @@ interface RunRow {
   branch: string | null;
   commit_sha: string | null;
   ci_url: string | null;
+  ci_job_outcome: string | null;
   uploads_json: string;
   total: number;
   passed: number;
@@ -42,6 +51,7 @@ function runToSummary(row: RunRow): RunSummary {
     branch: row.branch,
     commitSha: row.commit_sha,
     ciUrl: row.ci_url,
+    ciJobOutcome: parseCiJobOutcome(row.ci_job_outcome),
     uploads: JSON.parse(row.uploads_json) as UploadInfo[],
     total: row.total,
     passed: row.passed,

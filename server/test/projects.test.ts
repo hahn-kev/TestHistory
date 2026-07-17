@@ -203,3 +203,86 @@ describe('deletion', () => {
     expect(got.statusCode).toBe(404);
   });
 });
+
+describe('Primary Branch override', () => {
+  test('GET returns null override and unresolved when no runs', async () => {
+    const id = await createProject(admin, 'PBEmpty');
+    const res = await t.app.inject({ method: 'GET', url: `/api/projects/${id}`, headers: { cookie: admin } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().project.primaryBranch).toBeNull();
+    expect(res.json().project.resolvedPrimaryBranch).toBeNull();
+  });
+
+  test('owner can set and clear override; resolved follows override then auto-detect', async () => {
+    const id = await createProject(admin, 'PBSet');
+    // Seed a mainline run so auto-detect has something to pick after clear.
+    t.app.dbManager
+      .get(id)
+      .prepare('INSERT INTO runs (id, run_key, created_at, branch) VALUES (1, null, ?, ?)')
+      .run('2026-01-01T00:00:00.000Z', 'main');
+
+    let res = await t.app.inject({ method: 'GET', url: `/api/projects/${id}`, headers: { cookie: admin } });
+    expect(res.json().project.primaryBranch).toBeNull();
+    expect(res.json().project.resolvedPrimaryBranch).toBe('main');
+
+    res = await t.app.inject({
+      method: 'PATCH',
+      url: `/api/projects/${id}`,
+      headers: { cookie: admin },
+      payload: { primaryBranch: 'develop' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().project.primaryBranch).toBe('develop');
+    expect(res.json().project.resolvedPrimaryBranch).toBe('develop');
+
+    res = await t.app.inject({
+      method: 'PATCH',
+      url: `/api/projects/${id}`,
+      headers: { cookie: admin },
+      payload: { primaryBranch: null },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().project.primaryBranch).toBeNull();
+    expect(res.json().project.resolvedPrimaryBranch).toBe('main');
+  });
+
+  test('empty string clears override like null', async () => {
+    const id = await createProject(admin, 'PBClearEmpty');
+    await t.app.inject({
+      method: 'PATCH',
+      url: `/api/projects/${id}`,
+      headers: { cookie: admin },
+      payload: { primaryBranch: 'release' },
+    });
+    const res = await t.app.inject({
+      method: 'PATCH',
+      url: `/api/projects/${id}`,
+      headers: { cookie: admin },
+      payload: { primaryBranch: '' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().project.primaryBranch).toBeNull();
+  });
+
+  test('member cannot set Primary Branch (owner-only PATCH)', async () => {
+    await createUser(t.app, admin, 'pb-owner@example.com');
+    const owner = await login(t.app, 'pb-owner@example.com', 'password123');
+    const id = await createProject(owner, 'PBMember');
+    const memberId = await createUser(t.app, admin, 'pb-member@example.com');
+    const member = await login(t.app, 'pb-member@example.com', 'password123');
+    await t.app.inject({
+      method: 'POST',
+      url: `/api/projects/${id}/members`,
+      headers: { cookie: owner },
+      payload: { userId: memberId, role: 'member' },
+    });
+
+    const res = await t.app.inject({
+      method: 'PATCH',
+      url: `/api/projects/${id}`,
+      headers: { cookie: member },
+      payload: { primaryBranch: 'main' },
+    });
+    expect(res.statusCode).toBe(404);
+  });
+});

@@ -125,6 +125,30 @@ describe('multipart + append', () => {
     expect(b.json().run.total).toBe(4);
     expect(b.json().run.uploads).toHaveLength(2); // two uploads recorded, but counters recomputed
   });
+
+  test('multipart ci_job_outcome field sticks on the Run', async () => {
+    const first = await post(
+      `/api/projects/${projectId}/runs`,
+      multipart([
+        { name: 'file', filename: 'junit.xml', content: fx('junit-mixed.xml') },
+        { name: 'run_key', value: 'job-out' },
+        { name: 'ci_job_outcome', value: 'failed' },
+      ]),
+    );
+    expect(first.statusCode).toBe(201);
+    expect(first.json().run.ciJobOutcome).toBe('failed');
+
+    const second = await post(
+      `/api/projects/${projectId}/runs`,
+      multipart([
+        { name: 'file', filename: 'xunit.xml', content: fx('xunit-mixed.xml') },
+        { name: 'run_key', value: 'job-out' },
+        // omit ci_job_outcome — sticky trouble must remain
+      ]),
+    );
+    expect(second.statusCode).toBe(200);
+    expect(second.json().run.ciJobOutcome).toBe('failed');
+  });
 });
 
 describe('append window expiry', () => {

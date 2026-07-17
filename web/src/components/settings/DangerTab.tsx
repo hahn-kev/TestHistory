@@ -59,6 +59,8 @@ export function DangerTab({
         </label>
       </Card>
 
+      <PrimaryBranchCard project={project} onChanged={onChanged} />
+
       <Card className="space-y-2 border-fail/40 p-4">
         <h3 className="font-medium text-fail">Delete project</h3>
         <p className="text-sm text-muted">Permanently removes the project, its database, runs, and plugins.</p>
@@ -81,5 +83,68 @@ export function DangerTab({
 
       {error && <ErrorBox message={error} />}
     </div>
+  );
+}
+
+function PrimaryBranchCard({ project, onChanged }: { project: ProjectInfo; onChanged: () => void }) {
+  const [value, setValue] = useState(project.primaryBranch ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  async function save(primaryBranch: string | null) {
+    setError(null);
+    setSaved(false);
+    try {
+      const res = await api.updateProject(project.id, { primaryBranch });
+      setValue(res.project.primaryBranch ?? '');
+      setSaved(true);
+      onChanged();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Update failed.');
+    }
+  }
+
+  const resolved = project.resolvedPrimaryBranch;
+  const hasOverride = !!project.primaryBranch;
+
+  return (
+    <Card className="space-y-3 p-4">
+      <h3 className="font-medium text-fg">Primary Branch</h3>
+      <p className="text-sm text-muted">
+        Scopes the health trend. Leave empty to auto-detect from recent runs (
+        <code className="text-xs">main</code> → <code className="text-xs">master</code> →{' '}
+        <code className="text-xs">develop</code>, else most frequent non-PR branch).
+      </p>
+      <Field label="Override">
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="e.g. main"
+        />
+      </Field>
+      <p className="text-sm text-muted">
+        {resolved
+          ? hasOverride
+            ? `Using override: ${resolved}`
+            : `Auto-detected: ${resolved}`
+          : 'Unresolved — upload a mainline run or set an override.'}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => save(value.trim() || null)}>Save</Button>
+        {hasOverride && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setValue('');
+              void save(null);
+            }}
+          >
+            Clear override
+          </Button>
+        )}
+        {saved && <span className="self-center text-sm text-pass">Saved</span>}
+      </div>
+      {error && <ErrorBox message={error} />}
+    </Card>
   );
 }

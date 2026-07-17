@@ -56,4 +56,11 @@ export const projectMigrations: Migration[] = [
       );
     `,
   },
+  {
+    // CI Job Outcome on the Run (ADR-0003): unset | failed | cancelled.
+    version: 2,
+    sql: `
+      ALTER TABLE runs ADD COLUMN ci_job_outcome TEXT;
+    `,
+  },
 ];

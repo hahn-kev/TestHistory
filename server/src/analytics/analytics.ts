@@ -83,6 +83,61 @@ export function resolveAppendTarget(
   return { action: 'expired' };
 }
 
+/** Conventional mainline names, preferred in this order during Primary Branch auto-detect. */
+const CONVENTIONAL_PRIMARY = ['main', 'master', 'develop'] as const;
+
+/**
+ * Resolve the Project's Primary Branch for health-trend scoping.
+ *
+ * Non-empty `override` always wins. When override is empty, look at the last
+ * `limit` Runs (same default/clamp as the health chart): prefer `main` →
+ * `master` → `develop` if any appear; else the most frequent branch that is not
+ * a PR merge ref (ends with /merge); else unresolved (null). Recomputes live —
+ * no sticky snapshot of a past auto pick.
+ */
+export function resolvePrimaryBranch(
+  db: Db,
+  opts: { override?: string | null; limit?: number } = {},
+): string | null {
+  const override = opts.override?.trim() || null;
+  if (override) return override;
+
+  const limit = Math.max(1, Math.min(opts.limit ?? 50, 500));
+  const rows = db
+    .prepare(
+      `SELECT branch FROM runs
+        WHERE branch IS NOT NULL AND branch != ''
+        ORDER BY id DESC LIMIT ?`,
+    )
+    .all(limit) as { branch: string }[];
+
+  if (rows.length === 0) return null;
+
+  const present = new Set(rows.map((r) => r.branch));
+  for (const name of CONVENTIONAL_PRIMARY) {
+    if (present.has(name)) return name;
+  }
+
+  const counts = new Map<string, number>();
+  for (const { branch } of rows) {
+    if (branch.endsWith('/merge')) continue;
+    counts.set(branch, (counts.get(branch) ?? 0) + 1);
+  }
+  if (counts.size === 0) return null;
+
+  let best: string | null = null;
+  let bestCount = 0;
+  // Map insertion order follows first sighting in newest-first lookback; on ties
+  // the more recently seen branch name wins.
+  for (const [branch, count] of counts) {
+    if (count > bestCount) {
+      best = branch;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
 /**
  * Trend over the most recent runs (chronological order), optionally scoped to a
  * branch. One point per run with its status tallies + duration.

@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import type { TestResultRow, TestStatus } from '@testhistory/shared';
 import { ApiError, api } from '../api/client.js';
 import { useAsync } from '../hooks.js';
-import { AppIcon, Button, Card, EmptyState, ErrorBox, GitHubLink, Input, Spinner, StatusChip, fmtDate, fmtDuration, githubRunLinks } from '../ui.js';
+import { AppIcon, Button, Card, CiJobOutcomeBadge, EmptyState, ErrorBox, GitHubLink, Input, Spinner, StatusChip, fmtDate, fmtDuration, githubRunLinks } from '../ui.js';
 
 const STATUSES: (TestStatus | '')[] = ['', 'passed', 'failed', 'error', 'skipped'];
 const PAGE_SIZE = 50;
@@ -111,7 +111,10 @@ export function RunDetailPage() {
             <AppIcon name="arrow-left" className="h-4 w-4" />
             Back to project
           </Link>
-          <h1 className="mt-1 text-2xl font-semibold text-fg">Run #{r.id}</h1>
+          <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold text-fg">
+            <span>Run #{r.id}</span>
+            <CiJobOutcomeBadge outcome={r.ciJobOutcome} />
+          </h1>
         </div>
         <div className="flex items-center gap-3">
           {gh.ci && (

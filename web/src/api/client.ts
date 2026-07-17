@@ -87,8 +87,10 @@ export const api = {
   createProject: (b: { name: string; description?: string; private?: boolean }) =>
     req<{ project: ProjectInfo }>('POST', '/api/projects', b),
   getProject: (id: string) => req<{ project: ProjectInfo }>('GET', `/api/projects/${id}`),
-  updateProject: (id: string, b: Partial<{ name: string; description: string | null; private: boolean }>) =>
-    req<{ project: ProjectInfo }>('PATCH', `/api/projects/${id}`, b),
+  updateProject: (
+    id: string,
+    b: Partial<{ name: string; description: string | null; private: boolean; primaryBranch: string | null }>,
+  ) => req<{ project: ProjectInfo }>('PATCH', `/api/projects/${id}`, b),
   deleteProject: (id: string) => req<{ ok: true }>('DELETE', `/api/projects/${id}`),
 
   // --- members ---

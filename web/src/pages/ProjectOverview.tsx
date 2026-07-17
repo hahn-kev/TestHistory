@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useAsync } from '../hooks.js';
-import { AppIcon, Card, EmptyState, ErrorBox, GitHubIcon, GitHubLink, Spinner, StatusChip, fmtDate, fmtDuration, githubRunLinks } from '../ui.js';
+import { AppIcon, Card, CiJobOutcomeBadge, EmptyState, ErrorBox, GitHubIcon, GitHubLink, Spinner, StatusChip, fmtDate, fmtDuration, githubRunLinks } from '../ui.js';
 import { ProjectNav } from '../components/ProjectNav.js';
 import { BranchFilter } from '../components/BranchFilter.js';
 import { TrendChart } from '../components/TrendChart.js';
@@ -60,6 +60,11 @@ export function ProjectOverviewPage() {
                       #{r.id}
                     </Link>
                     {r.label && <span className="ml-2 text-muted">{r.label}</span>}
+                    {r.ciJobOutcome && (
+                      <span className="ml-2 inline-flex align-middle">
+                        <CiJobOutcomeBadge outcome={r.ciJobOutcome} />
+                      </span>
+                    )}
                     {ciUrl && (
                       <a
                         href={ciUrl}

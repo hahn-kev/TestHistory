@@ -109,6 +109,139 @@ describe('ingest() core — per-format counters', () => {
   });
 });
 
+/** Minimal JUnit fixture path for CI Job Outcome ingest-core tests. */
+const JUNIT_MIXED = fx('junit-mixed.xml');
+const JUNIT_FILE = () => ({
+  tempPath: JUNIT_MIXED,
+  fileName: 'junit-mixed.xml',
+  fileSize: fs.statSync(JUNIT_MIXED).size,
+  format: 'junit' as const,
+});
+const baseMeta = () => ({
+  runKey: null as string | null,
+  branch: null as string | null,
+  commitSha: null as string | null,
+  label: null as string | null,
+  ciUrl: null as string | null,
+  startedAt: null as string | null,
+  ciJobOutcome: null as 'failed' | 'cancelled' | null,
+});
+
+describe('ingest() core — CI Job Outcome', () => {
+  test('create with outcome omitted leaves CI Job Outcome unset', async () => {
+    const t = tempDbFile();
+    const db = openMigrated(t.path);
+    try {
+      const { run } = await ingest(db, {
+        dbPath: t.path,
+        files: [JUNIT_FILE()],
+        meta: baseMeta(),
+        now: NOW,
+        windowMs: 3_600_000,
+      });
+      expect(run.ciJobOutcome).toBeNull();
+    } finally {
+      db.close();
+      t.cleanup();
+    }
+  });
+
+  test('create with failed / cancelled sets CI Job Outcome', async () => {
+    const t = tempDbFile();
+    const db = openMigrated(t.path);
+    try {
+      const failed = await ingest(db, {
+        dbPath: t.path,
+        files: [JUNIT_FILE()],
+        meta: { ...baseMeta(), ciJobOutcome: 'failed' },
+        now: NOW,
+        windowMs: 3_600_000,
+      });
+      expect(failed.run.ciJobOutcome).toBe('failed');
+
+      const cancelled = await ingest(db, {
+        dbPath: t.path,
+        files: [JUNIT_FILE()],
+        meta: { ...baseMeta(), ciJobOutcome: 'cancelled' },
+        now: NOW,
+        windowMs: 3_600_000,
+      });
+      expect(cancelled.run.ciJobOutcome).toBe('cancelled');
+    } finally {
+      db.close();
+      t.cleanup();
+    }
+  });
+
+  test('append with omitted outcome does not clear sticky trouble', async () => {
+    const t = tempDbFile();
+    const db = openMigrated(t.path);
+    try {
+      const first = await ingest(db, {
+        dbPath: t.path,
+        files: [JUNIT_FILE()],
+        meta: { ...baseMeta(), runKey: 'build-1', ciJobOutcome: 'failed' },
+        now: NOW,
+        windowMs: 3_600_000,
+      });
+      expect(first.created).toBe(true);
+      expect(first.run.ciJobOutcome).toBe('failed');
+
+      const second = await ingest(db, {
+        dbPath: t.path,
+        files: [JUNIT_FILE()],
+        meta: { ...baseMeta(), runKey: 'build-1', ciJobOutcome: null },
+        now: '2026-06-01T00:30:00.000Z',
+        windowMs: 3_600_000,
+      });
+      expect(second.created).toBe(false);
+      expect(second.run.id).toBe(first.run.id);
+      expect(second.run.ciJobOutcome).toBe('failed');
+    } finally {
+      db.close();
+      t.cleanup();
+    }
+  });
+
+  test('across uploads, cancelled is preferred over failed', async () => {
+    const t = tempDbFile();
+    const db = openMigrated(t.path);
+    try {
+      const first = await ingest(db, {
+        dbPath: t.path,
+        files: [JUNIT_FILE()],
+        meta: { ...baseMeta(), runKey: 'build-2', ciJobOutcome: 'failed' },
+        now: NOW,
+        windowMs: 3_600_000,
+      });
+      expect(first.run.ciJobOutcome).toBe('failed');
+
+      const second = await ingest(db, {
+        dbPath: t.path,
+        files: [JUNIT_FILE()],
+        meta: { ...baseMeta(), runKey: 'build-2', ciJobOutcome: 'cancelled' },
+        now: '2026-06-01T00:30:00.000Z',
+        windowMs: 3_600_000,
+      });
+      expect(second.created).toBe(false);
+      expect(second.run.ciJobOutcome).toBe('cancelled');
+
+      // Later failed must not downgrade cancelled.
+      const third = await ingest(db, {
+        dbPath: t.path,
+        files: [JUNIT_FILE()],
+        meta: { ...baseMeta(), runKey: 'build-2', ciJobOutcome: 'failed' },
+        now: '2026-06-01T00:45:00.000Z',
+        windowMs: 3_600_000,
+      });
+      expect(third.run.ciJobOutcome).toBe('cancelled');
+    } finally {
+      db.close();
+      t.cleanup();
+    }
+  });
+});
+
 describe('upload route (worker pool + queue)', () => {
   let t: TestApp;
   let admin: string;
@@ -139,6 +272,33 @@ describe('upload route (worker pool + queue)', () => {
     const run = res.json().run;
     expect({ total: run.total, passed: run.passed, failed: run.failed, errored: run.errored, skipped: run.skipped }).toEqual({ total: 4, passed: 1, failed: 1, errored: 1, skipped: 1 });
     expect(run.branch).toBe('main');
+    expect(run.ciJobOutcome).toBeNull();
+  });
+
+  test('query ci_job_outcome is accepted and returned on the run', async () => {
+    const xml = fs.readFileSync(fx('junit-mixed.xml'));
+    const res = await t.app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/runs?branch=main&ci_job_outcome=cancelled`,
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/xml' },
+      payload: xml,
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().run.ciJobOutcome).toBe('cancelled');
+
+    const detail = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/runs/${res.json().run.id}`,
+      headers: { cookie: admin },
+    });
+    expect(detail.json().run.ciJobOutcome).toBe('cancelled');
+
+    const list = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/runs`,
+      headers: { cookie: admin },
+    });
+    expect(list.json().runs[0].ciJobOutcome).toBe('cancelled');
   });
 
   test('session member upload works', async () => {
