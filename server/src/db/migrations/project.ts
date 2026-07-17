@@ -57,8 +57,15 @@ export const projectMigrations: Migration[] = [
     `,
   },
   {
-    // CI Job Outcome on the Run (ADR-0003): unset | failed | cancelled.
     version: 2,
+    // How many raw test cases collapsed onto this (test_id, run_id). 1 = no
+    // collision; >1 flags duplicates merged at ingest (parameterized rows sharing
+    // an identity, genuine dup test names, or repeated uploads into one run).
+    sql: `ALTER TABLE results ADD COLUMN case_count INTEGER NOT NULL DEFAULT 1;`,
+  },
+  {
+    // CI Job Outcome on the Run (ADR-0003): unset | failed | cancelled.
+    version: 3,
     sql: `
       ALTER TABLE runs ADD COLUMN ci_job_outcome TEXT;
     `,

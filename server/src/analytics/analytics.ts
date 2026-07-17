@@ -163,7 +163,8 @@ export function getTestHistory(db: Db, testId: number): TestHistoryEntry[] {
     .prepare(
       `SELECT r.run_id AS runId, ru.created_at AS createdAt, ru.branch AS branch,
               ru.commit_sha AS commitSha, ru.label AS label,
-              r.status AS statusCode, r.duration_ms AS durationMs, r.message AS message, r.stack AS stack
+              r.status AS statusCode, r.duration_ms AS durationMs, r.message AS message, r.stack AS stack,
+              r.case_count AS caseCount
          FROM results r JOIN runs ru ON ru.id = r.run_id
         WHERE r.test_id = ?
         ORDER BY r.run_id DESC`,

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MSTest [DataRow]: several <UnitTestResult> rows share ONE testId (one
+     <UnitTest> definition) and differ only by `testName`. Fail-then-pass order
+     to expose any last-wins masking of the failure. -->
+<TestRun id="run-1" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Results>
+    <UnitTestResult testId="bbbbbbbb-0000-0000-0000-000000000001" testName="Adds (1,2)" outcome="Failed" duration="00:00:00.0100000">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.AreEqual failed</Message>
+          <StackTrace>at Fixture.Adds()</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult testId="bbbbbbbb-0000-0000-0000-000000000001" testName="Adds (2,3)" outcome="Passed" duration="00:00:00.0100000"/>
+    <UnitTestResult testId="bbbbbbbb-0000-0000-0000-000000000001" testName="Adds (3,4)" outcome="Passed" duration="00:00:00.0100000"/>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Adds" id="bbbbbbbb-0000-0000-0000-000000000001">
+      <TestMethod className="MyApp.Tests.MathTests, MyApp.Tests, Version=1.0.0.0" name="Adds"/>
+    </UnitTest>
+  </TestDefinitions>
+</TestRun>

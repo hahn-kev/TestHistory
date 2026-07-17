@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A Theory: one <test> per data row, same type+method, distinct display names.
+     Row order is fail-then-pass to guard against last-wins masking the failure. -->
+<assemblies>
+  <assembly name="MyLib.Tests.dll" total="3">
+    <collection name="collection-1" total="3">
+      <test name="MyLib.Tests.MathTests.Adds(a: 1, b: 2)" type="MyLib.Tests.MathTests" method="Adds" result="Fail" time="0.0100">
+        <failure exception-type="Xunit.Sdk.EqualException">
+          <message>Assert.Equal() Failure</message>
+          <stack-trace>at MathTests.Adds()</stack-trace>
+        </failure>
+      </test>
+      <test name="MyLib.Tests.MathTests.Adds(a: 2, b: 3)" type="MyLib.Tests.MathTests" method="Adds" result="Pass" time="0.0100"/>
+      <test name="MyLib.Tests.MathTests.Adds(a: 3, b: 4)" type="MyLib.Tests.MathTests" method="Adds" result="Pass" time="0.0100"/>
+    </collection>
+  </assembly>
+</assemblies>

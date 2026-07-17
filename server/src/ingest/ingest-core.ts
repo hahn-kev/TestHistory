@@ -3,7 +3,7 @@ import type { Database as Db } from 'better-sqlite3';
 import type { CiJobOutcome, RunSummary, UploadInfo, ResultFormat } from '@testhistory/shared';
 import { parseCiJobOutcome } from '@testhistory/shared';
 import { parseStream } from './parse.js';
-import { STATUS_CODE, MESSAGE_CAP, STACK_CAP, truncate } from './model.js';
+import { STATUS_CODE, MESSAGE_CAP, STACK_CAP, truncate, statusSeveritySql } from './model.js';
 import { compileRules, applyRules, type NameRule, type CompiledRule } from './names.js';
 import { recomputeRunCounters, resolveAppendTarget } from '../analytics/analytics.js';
 import type { IngestPayload, IngestResult } from './types.js';
@@ -63,7 +63,7 @@ export function mergeCiJobOutcome(
 /**
  * Ingest one POST's files into a project DB in a single transaction. Resolves
  * the append target by run key, streams + parses each file applying name rules,
- * upserts tests/results (last-write-wins on (test_id,run_id)), appends uploads,
+ * upserts tests/results (severity-aware merge on (test_id,run_id)), appends uploads,
  * and recomputes counters + duration/started_at from source data. A parse error
  * rolls the whole POST back. Returns the run summary and whether it was created.
  */
@@ -123,12 +123,20 @@ export async function ingest(db: Db, payload: IngestPayload): Promise<IngestResu
        ON CONFLICT(suite, name) DO UPDATE SET last_seen_run_id = MAX(last_seen_run_id, excluded.last_seen_run_id)
        RETURNING id`,
     );
+    // On collision, keep the more-severe outcome (and its detail) rather than
+    // blindly the last one written, so a failing row can't be masked by a later
+    // passing/skipped row for the same identity. Ties keep the newer row. Every
+    // collision bumps case_count so unexpected merges are detectable after the fact.
+    const takeNew = `${statusSeveritySql('excluded.status')} >= ${statusSeveritySql('status')}`;
     const upsertResult = db.prepare(
       `INSERT INTO results (test_id, run_id, status, duration_ms, message, stack)
        VALUES (@testId, @runId, @status, @durationMs, @message, @stack)
        ON CONFLICT(test_id, run_id) DO UPDATE SET
-         status = excluded.status, duration_ms = excluded.duration_ms,
-         message = excluded.message, stack = excluded.stack`,
+         status      = CASE WHEN ${takeNew} THEN excluded.status      ELSE status      END,
+         duration_ms = CASE WHEN ${takeNew} THEN excluded.duration_ms ELSE duration_ms END,
+         message     = CASE WHEN ${takeNew} THEN excluded.message     ELSE message     END,
+         stack       = CASE WHEN ${takeNew} THEN excluded.stack       ELSE stack       END,
+         case_count  = case_count + 1`,
     );
 
     const testIdCache = new Map<string, number>();

@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`JUnit > edge: single suite, empty classname, dup last-wins, message from text 1`] = `
+exports[`JUnit > edge: single suite, empty classname, dup worst-status-wins, message from text 1`] = `
 [
   {
     "durationMs": 1500,
@@ -9,9 +9,11 @@ exports[`JUnit > edge: single suite, empty classname, dup last-wins, message fro
     "suite": "",
   },
   {
-    "durationMs": 20,
+    "durationMs": 10,
+    "message": "first outcome failed",
     "name": "sometimes",
-    "status": "passed",
+    "stack": "first outcome failed",
+    "status": "failed",
     "suite": "pkg.Flaky",
   },
 ]

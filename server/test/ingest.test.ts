@@ -98,10 +98,50 @@ describe('ingest() core — per-format counters', () => {
         windowMs: 3_600_000,
         nameRules: [{ match: '\\[seed=\\d+\\]', rewrite: '[seed]' }],
       });
-      // Both collapse to one identity → last-write-wins → 1 test.
+      // Both collapse to one identity → 1 test, and case_count records that two
+      // raw cases merged so an unintended collapse is detectable after the fact.
       expect(run.total).toBe(1);
       const names = (db.prepare('SELECT name FROM tests').all() as { name: string }[]).map((r) => r.name);
       expect(names).toEqual(['case[seed]']);
+      const counts = db.prepare('SELECT case_count FROM results').all() as { case_count: number }[];
+      expect(counts).toEqual([{ case_count: 2 }]);
+    } finally {
+      db.close();
+      t.cleanup();
+    }
+  });
+
+  test('colliding rows merge worst-status-wins and count the collision', async () => {
+    const t = tempDbFile();
+    const db = openMigrated(t.path);
+    // Two xUnit <test> rows with the same (type, method): the FIRST fails, the
+    // second passes. Worst-wins must keep the failure — never mask it by order.
+    const f = path.join(path.dirname(t.path), 'dup.xml');
+    fs.writeFileSync(
+      f,
+      `<assembly name="Dup.dll" total="2"><collection name="c">
+        <test name="Ns.Fix.T" type="Ns.Fix" method="T" result="Fail" time="0.01">
+          <failure><message>boom</message></failure>
+        </test>
+        <test name="Ns.Fix.T" type="Ns.Fix" method="T" result="Pass" time="0.02"/>
+      </collection></assembly>`,
+    );
+    try {
+      const { run } = await ingest(db, {
+        dbPath: t.path,
+        files: [{ tempPath: f, fileName: 'dup.xml', fileSize: 100, format: 'xunit' }],
+        meta: { runKey: null, branch: null, commitSha: null, label: null, ciUrl: null, startedAt: null },
+        now: NOW,
+        windowMs: 3_600_000,
+      });
+      // One merged test, recorded as failed (not the later pass), and flagged dup.
+      expect({ total: run.total, failed: run.failed, passed: run.passed }).toMatchObject({ total: 1, failed: 1, passed: 0 });
+      const row = db.prepare('SELECT status, message, case_count FROM results').get() as {
+        status: number;
+        message: string | null;
+        case_count: number;
+      };
+      expect(row).toEqual({ status: 1, message: 'boom', case_count: 2 });
     } finally {
       db.close();
       t.cleanup();
