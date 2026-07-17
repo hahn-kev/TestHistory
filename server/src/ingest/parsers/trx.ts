@@ -5,11 +5,16 @@ import { runSax, trxDurationToMs } from './sax-base.js';
 /**
  * Visual Studio TRX (`<TestRun>`). Results and TestDefinitions are separate
  * sections joined by testId, and their order isn't guaranteed, so both are
- * buffered into maps and joined on stream end. suite = `TestMethod className`
- * (assembly suffix stripped), name = `TestMethod name`.
+ * buffered and joined on stream end. suite = `TestMethod className` (assembly
+ * suffix stripped); name = the per-result `testName`, falling back to the
+ * definition's `name`. Data-driven tests (`[DataRow]`) emit several results that
+ * share one testId and differ only by `testName`, so results are kept as a list
+ * per testId — collapsing them onto the testId would drop every row but the last
+ * (and could mask a failing row behind a later passing one).
  */
 export async function parseTRX(stream: Readable, onCase: (tc: TestCase) => void): Promise<void> {
   interface ResultRow {
+    testName?: string;
     outcome: string;
     durationMs?: number;
     message?: string;
@@ -20,7 +25,7 @@ export async function parseTRX(stream: Readable, onCase: (tc: TestCase) => void)
     name: string;
   }
 
-  const results = new Map<string, ResultRow>();
+  const results = new Map<string, ResultRow[]>();
   const defs = new Map<string, DefRow>();
 
   let currentResult: { testId: string; row: ResultRow } | null = null;
@@ -61,7 +66,7 @@ export async function parseTRX(stream: Readable, onCase: (tc: TestCase) => void)
         if (a.testId) {
           currentResult = {
             testId: a.testId,
-            row: { outcome: a.outcome ?? '', durationMs: trxDurationToMs(a.duration) },
+            row: { testName: a.testName, outcome: a.outcome ?? '', durationMs: trxDurationToMs(a.duration) },
           };
         }
       } else if (tag.name === 'UnitTest') {
@@ -92,7 +97,9 @@ export async function parseTRX(stream: Readable, onCase: (tc: TestCase) => void)
         if (t) currentResult.row.stack = t;
         textTarget = null;
       } else if (tag.name === 'UnitTestResult' && currentResult) {
-        results.set(currentResult.testId, currentResult.row);
+        const list = results.get(currentResult.testId);
+        if (list) list.push(currentResult.row);
+        else results.set(currentResult.testId, [currentResult.row]);
         currentResult = null;
       } else if (tag.name === 'UnitTest') {
         currentDefId = null;
@@ -100,17 +107,21 @@ export async function parseTRX(stream: Readable, onCase: (tc: TestCase) => void)
     },
   });
 
-  // Join: emit one case per result that has a matching definition.
-  for (const [testId, res] of results) {
+  // Join: emit one case per result that has a matching definition. A result's
+  // own `testName` distinguishes data-driven rows; fall back to the definition
+  // name for the ordinary one-result-per-test case.
+  for (const [testId, rows] of results) {
     const def = defs.get(testId);
     if (!def) continue;
-    onCase({
-      suite: def.suite,
-      name: def.name,
-      status: mapOutcome(res.outcome),
-      durationMs: res.durationMs,
-      message: res.message,
-      stack: res.stack,
-    });
+    for (const res of rows) {
+      onCase({
+        suite: def.suite,
+        name: res.testName ?? def.name,
+        status: mapOutcome(res.outcome),
+        durationMs: res.durationMs,
+        message: res.message,
+        stack: res.stack,
+      });
+    }
   }
 }

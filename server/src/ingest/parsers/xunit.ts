@@ -4,8 +4,12 @@ import { runSax, secondsToMs } from './sax-base.js';
 
 /**
  * xUnit.net XML (`<assemblies>`/`<assembly>` → `<collection>` → `<test>`).
- * suite = `type`, name = `method`. Status from `result` (Pass/Fail/Skip);
- * message/stack from a `<failure>` child, skip reason from `<reason>`.
+ * suite = `type`; name = the display `name` with the redundant `type.` prefix
+ * stripped, falling back to `method`. Using the display name keeps each Theory
+ * data row distinct (`method(args…)`) instead of collapsing every row onto the
+ * bare method — a plain Fact still reduces to its method name, so its identity is
+ * unchanged. Status from `result` (Pass/Fail/Skip); message/stack from a
+ * `<failure>` child, skip reason from `<reason>`.
  */
 export async function parseXUnit(stream: Readable, onCase: (tc: TestCase) => void): Promise<void> {
   let current: TestCase | null = null;
@@ -29,9 +33,14 @@ export async function parseXUnit(stream: Readable, onCase: (tc: TestCase) => voi
     onOpen(tag) {
       const a = tag.attributes;
       if (tag.name === 'test') {
+        const type = a.type ?? '';
+        let name = a.method ?? '';
+        if (a.name) {
+          name = type && a.name.startsWith(`${type}.`) ? a.name.slice(type.length + 1) : a.name;
+        }
         current = {
-          suite: a.type ?? '',
-          name: a.method ?? a.name ?? '',
+          suite: type,
+          name,
           status: mapStatus(a.result),
           durationMs: secondsToMs(a.time),
         };
