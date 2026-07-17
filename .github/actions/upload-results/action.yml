@@ -50,6 +50,13 @@ inputs:
     description: 'Link back to the CI pipeline.'
     required: false
     default: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+  ci-job-outcome:
+    description: >-
+      CI Job Outcome for this job only (`failed` or `cancelled`). When omitted, mapped from
+      job.status at upload time (failure→failed, cancelled→cancelled; success is not sent).
+      Use with `if: always()` so cancel/fail jobs still upload. Does not reflect sibling jobs.
+    required: false
+    default: ''
   started-at:
     description: 'ISO timestamp for when the run started (defaults to current UTC time if not provided).'
     required: false
@@ -106,6 +113,9 @@ runs:
         INPUT_FORMAT: ${{ inputs.format }}
         INPUT_LABEL: ${{ inputs.label }}
         INPUT_CI_URL: ${{ inputs.ci-url }}
+        INPUT_CI_JOB_OUTCOME: ${{ inputs.ci-job-outcome }}
+        # Best-effort default for CI Job Outcome when the input is empty.
+        JOB_STATUS: ${{ job.status }}
         INPUT_STARTED_AT: ${{ inputs.started-at }}
         INPUT_CREATE_CHECK: ${{ inputs.create-check }}
         INPUT_CHECK_NAME: ${{ inputs.check-name }}

@@ -49,6 +49,12 @@ curl --data-binary @results.xml \
 curl -F file=@shard1.xml -F file=@shard2.xml -F run_key=$CI_BUILD_ID \
   -H "Authorization: Bearer tht_…" \
   "http://localhost:3000/api/projects/<projectId>/runs"
+
+# Optional CI Job Outcome (failed | cancelled) — sticky on the Run for run-list badges
+curl -F file=@results.xml -F run_key=$CI_BUILD_ID -F ci_job_outcome=cancelled \
+  -H "Authorization: Bearer tht_…" \
+  "http://localhost:3000/api/projects/<projectId>/runs"
+# Same field works as a query param on raw uploads: ?ci_job_outcome=failed
 ```
 
 Supported formats are auto-detected (JUnit `<testsuites>`/`<testsuite>`, NUnit v2
@@ -96,6 +102,7 @@ To use it, add a step like this in your workflow:
 | `format` | Override parser format (e.g., `junit`, `nunit3`, `xunit`, `trx`). | Auto-detected |
 | `label` | A custom label for this run. | (None) |
 | `ci-url` | Link back to the CI run. | `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}` |
+| `ci-job-outcome` | **CI Job Outcome** for this job (`failed` or `cancelled`). Empty → map from `job.status` (see below). | (mapped / omitted) |
 | `started-at` | ISO 8601 timestamp for the run start. | (Current UTC time) |
 | `create-check` | Create/update a GitHub check run linking to the run on your TestHistory instance. | `true` |
 | `check-name` | Name of the check run. Every upload in the same build updates this one check. | `TestHistory` |
@@ -112,6 +119,44 @@ To use it, add a step like this in your workflow:
 | `errored` | Number of errored tests. |
 | `skipped` | Number of skipped tests. |
 | `check-run-id` | ID of the GitHub check run created/updated (empty if skipped or unavailable). |
+
+#### CI Job Outcome
+
+Uploads may optionally report this **job’s** fate as **CI Job Outcome** (`failed` or
+`cancelled`). TestHistory stores it on the Run for run-list badges; it does **not** change
+charts, flaky detection, or require a finalize job. Sibling jobs are out of scope — each
+upload reports only the job that performed it. Omitting the field leaves the Run unchanged
+(sticky trouble outcomes already set are not cleared).
+
+The Action’s `ci-job-outcome` input is optional. When left empty, it maps from GitHub’s
+`job.status` at upload time:
+
+| `job.status` | Sent as `ci_job_outcome` |
+| --- | --- |
+| `failure` | `failed` |
+| `cancelled` | `cancelled` |
+| `success` (or anything else) | *(omitted — do not send success)* |
+
+Existing workflows that ignore the new input keep working: success-path uploads send no
+outcome; trouble jobs that still reach upload (typically `if: always()`) send `failed` or
+`cancelled` automatically.
+
+```yaml
+- name: Upload Test Results
+  if: always() # still upload after test failure or cancel-in-progress
+  uses: hahn-kev/testhistory/.github/actions/upload-results@latest
+  with:
+    server-url: 'https://testhistory.company.com'
+    project-id: 'your-project-id'
+    api-token: ${{ secrets.TESTHISTORY_TOKEN }}
+    files: '**/junit-*.xml'
+    # Optional override; default already maps job.status as above.
+    # Explicit form if you prefer expressions:
+    # ci-job-outcome: ${{ cancelled() && 'cancelled' || failure() && 'failed' || '' }}
+```
+
+Raw curl / custom pipelines use the same metadata field (`ci_job_outcome` query or multipart)
+as shown under [Uploading results from CI](#uploading-results-from-ci).
 
 #### Run check
 

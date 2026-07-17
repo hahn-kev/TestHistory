@@ -4,9 +4,9 @@
 
 **Blocked by:** 03 — CI Job Outcome backend
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Action accepts optional job-outcome input and forwards it on upload
-- [ ] Sensible default from the job/workflow context where GitHub exposes it (best-effort; success/omit when not in trouble)
-- [ ] README / Action docs describe the field, defaults, and curl equivalent
-- [ ] Existing workflows that ignore the new input keep uploading successfully
+- [x] Action accepts optional job-outcome input and forwards it on upload
+- [x] Sensible default from the job/workflow context where GitHub exposes it (best-effort; success/omit when not in trouble)
+- [x] README / Action docs describe the field, defaults, and curl equivalent
+- [x] Existing workflows that ignore the new input keep uploading successfully

@@ -167,6 +167,89 @@ describe('trend + flaky + branch scoping', () => {
   });
 });
 
+describe('trend dual series (health vs recent)', () => {
+  test('mode=recent is unfiltered; mode=health scopes to resolved Primary Branch', async () => {
+    await upload(oneTest('pass'), '?branch=main');
+    await upload(oneTest('pass'), '?branch=feature');
+    await upload(oneTest('fail'), '?branch=main');
+    await upload(oneTest('pass'), '?branch=feature');
+
+    const recent = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/trend?mode=recent&limit=50`,
+      headers: { cookie: admin },
+    });
+    expect(recent.statusCode).toBe(200);
+    expect(recent.json().mode).toBe('recent');
+    expect(recent.json().trend).toHaveLength(4);
+
+    const health = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/trend?mode=health&limit=50`,
+      headers: { cookie: admin },
+    });
+    expect(health.statusCode).toBe(200);
+    const body = health.json();
+    expect(body.mode).toBe('health');
+    expect(body.primaryBranch).toBeNull();
+    expect(body.resolvedPrimaryBranch).toBe('main');
+    expect(body.trend).toHaveLength(2);
+    expect(body.trend.every((p: { branch: string }) => p.branch === 'main')).toBe(true);
+  });
+
+  test('mode=health uses override; empty when Primary Branch unresolved (no all-branches fallback)', async () => {
+    await upload(oneTest('pass'), '?branch=feature-a');
+    await upload(oneTest('pass'), '?branch=feature-b');
+
+    await t.app.inject({
+      method: 'PATCH',
+      url: `/api/projects/${projectId}`,
+      headers: { cookie: admin },
+      payload: { primaryBranch: 'feature-a' },
+    });
+
+    const overridden = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/trend?mode=health`,
+      headers: { cookie: admin },
+    });
+    expect(overridden.json().primaryBranch).toBe('feature-a');
+    expect(overridden.json().resolvedPrimaryBranch).toBe('feature-a');
+    expect(overridden.json().trend).toHaveLength(1);
+    expect(overridden.json().trend[0].branch).toBe('feature-a');
+
+    // Clear override; only PR merge refs remain → unresolved → empty health, not all branches.
+    await t.app.inject({
+      method: 'PATCH',
+      url: `/api/projects/${projectId}`,
+      headers: { cookie: admin },
+      payload: { primaryBranch: null },
+    });
+    // Wipe feature runs and leave only merge refs so auto-detect fails.
+    const d = t.app.dbManager.get(projectId);
+    d.prepare('DELETE FROM results').run();
+    d.prepare('DELETE FROM runs').run();
+    await upload(oneTest('pass'), '?branch=refs/pull/1/merge');
+    await upload(oneTest('pass'), '?branch=refs/pull/2/merge');
+
+    const unresolved = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/trend?mode=health`,
+      headers: { cookie: admin },
+    });
+    expect(unresolved.json().mode).toBe('health');
+    expect(unresolved.json().resolvedPrimaryBranch).toBeNull();
+    expect(unresolved.json().trend).toEqual([]);
+
+    const recentStillHas = await t.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/trend?mode=recent`,
+      headers: { cookie: admin },
+    });
+    expect(recentStillHas.json().trend).toHaveLength(2);
+  });
+});
+
 describe('tests search + history', () => {
   test('search finds tests; history is newest-first; 404 for missing test', async () => {
     await upload(oneTest('pass'));

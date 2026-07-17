@@ -17,6 +17,7 @@ import {
   getTestHistory,
   compareRuns,
   resolveRunRef,
+  resolvePrimaryBranch,
   type RunRefResolution,
 } from '../analytics/analytics.js';
 import { formatComparisonMarkdown } from '../analytics/compare-format.js';
@@ -191,9 +192,37 @@ export async function readRoutes(app: FastifyInstance) {
   });
 
   // --- Trend (analytics) ---
+  // mode=health → Primary Branch only (empty if unresolved; never all-branches fallback).
+  // mode=recent → last N Runs across all branches (unfiltered ledger).
+  // No mode → legacy: optional ?branch= filter (unchanged).
   app.get('/api/projects/:id/trend', { preHandler: viewer }, async (req) => {
     const q = req.query as Record<string, string>;
-    return { trend: computeTrend(db(req.project!.id), { limit: clampLimit(q.limit, 50, 500), branch: str(q.branch) }) };
+    const limit = clampLimit(q.limit, 50, 500);
+    const projectDb = db(req.project!.id);
+    const mode = q.mode === 'health' || q.mode === 'recent' ? q.mode : null;
+
+    if (mode === 'health') {
+      const primaryBranch = req.project!.primary_branch?.trim() || null;
+      const resolvedPrimaryBranch = resolvePrimaryBranch(projectDb, {
+        override: primaryBranch,
+        limit,
+      });
+      if (!resolvedPrimaryBranch) {
+        return { trend: [], mode, primaryBranch, resolvedPrimaryBranch: null };
+      }
+      return {
+        trend: computeTrend(projectDb, { limit, branch: resolvedPrimaryBranch }),
+        mode,
+        primaryBranch,
+        resolvedPrimaryBranch,
+      };
+    }
+
+    if (mode === 'recent') {
+      return { trend: computeTrend(projectDb, { limit }), mode };
+    }
+
+    return { trend: computeTrend(projectDb, { limit, branch: str(q.branch) }) };
   });
 
   // --- Flaky (analytics) ---

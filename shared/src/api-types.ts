@@ -152,6 +152,19 @@ export interface TrendPoint {
   durationMs: number | null;
 }
 
+/** `GET /trend` mode: health = Primary Branch; recent = unfiltered last N. */
+export type TrendMode = 'health' | 'recent';
+
+/** Response for `GET /api/projects/:id/trend` (mode fields present when `?mode=` is set). */
+export interface TrendResponse {
+  trend: TrendPoint[];
+  mode?: TrendMode;
+  /** Primary Branch override (health mode only). */
+  primaryBranch?: string | null;
+  /** Resolved Primary Branch after override/auto-detect (health mode only; null if unresolved). */
+  resolvedPrimaryBranch?: string | null;
+}
+
 export interface NameRule {
   match: string;
   rewrite: string;
