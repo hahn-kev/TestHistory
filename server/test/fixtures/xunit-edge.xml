@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- single <assembly> root (no <assemblies> wrapper); duplicate (type,method) last-wins -->
+<!-- single <assembly> root (no <assemblies> wrapper); duplicate (type,method)
+     collapses worst-status-wins: the failing row beats the later passing one -->
 <assembly name="Edge.dll" total="2">
   <collection name="c">
     <test name="Edge.Fixture.Repeated" type="Edge.Fixture" method="Repeated" result="Fail" time="0.01">

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- NUnit v2 [TestCase]: each row is a <test-case> whose name carries the args.
+     Fail-then-pass order to expose any last-wins masking of the failure. -->
+<test-results name="Suite.dll" total="3" failures="1">
+  <test-suite type="Assembly" name="Suite.dll">
+    <results>
+      <test-suite type="TestFixture" name="Suite.MathTests">
+        <results>
+          <test-case name="Suite.MathTests.Adds(1,2)" executed="True" result="Failure" success="False" time="0.010">
+            <failure>
+              <message>Expected 3 but was 4</message>
+              <stack-trace>at MathTests.Adds()</stack-trace>
+            </failure>
+          </test-case>
+          <test-case name="Suite.MathTests.Adds(2,3)" executed="True" result="Success" success="True" time="0.010"/>
+          <test-case name="Suite.MathTests.Adds(3,4)" executed="True" result="Success" success="True" time="0.010"/>
+        </results>
+      </test-suite>
+    </results>
+  </test-suite>
+</test-results>

@@ -116,6 +116,8 @@ export interface TestHistoryEntry {
   durationMs: number | null;
   message: string | null;
   stack: string | null;
+  /** How many raw test cases merged onto this run's result. 1 = no duplicates. */
+  caseCount: number;
 }
 
 export interface FlakyTestEntry {

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- JUnit5 @ParameterizedTest: one <testcase> per invocation, distinct names.
+     Fail-then-pass order to expose any last-wins masking of the failure. -->
+<testsuites>
+  <testsuite name="math" tests="3" failures="1">
+    <testcase classname="math.AddTest" name="adds(int, int)[1]" time="0.010">
+      <failure message="expected 3 but got 4" type="AssertionError">at AddTest.adds</failure>
+    </testcase>
+    <testcase classname="math.AddTest" name="adds(int, int)[2]" time="0.010"/>
+    <testcase classname="math.AddTest" name="adds(int, int)[3]" time="0.010"/>
+  </testsuite>
+</testsuites>

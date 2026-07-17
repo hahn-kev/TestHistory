@@ -35,7 +35,11 @@ export function TestDetailPage() {
         <h2 className="mb-3 text-sm font-medium text-fg">Status timeline (oldest → newest)</h2>
         <div className="flex flex-wrap gap-1">
           {chrono.map((h) => (
-            <Link key={h.runId} to={`/projects/${id}/runs/${h.runId}`} title={`#${h.runId} · ${h.status} · ${fmtDate(h.createdAt)}`}>
+            <Link
+              key={h.runId}
+              to={`/projects/${id}/runs/${h.runId}`}
+              title={`#${h.runId} · ${h.status}${h.caseCount > 1 ? ` · ${h.caseCount} cases merged` : ''} · ${fmtDate(h.createdAt)}`}
+            >
               <StatusDot status={h.status} />
             </Link>
           ))}
@@ -81,6 +85,15 @@ export function TestDetailPage() {
                 </td>
                 <td className="px-4 py-2">
                   <StatusDot status={h.status} /> <span className="ml-1 capitalize text-muted">{h.status}</span>
+                  {h.caseCount > 1 && (
+                    <span
+                      title={`${h.caseCount} test cases merged into this result — likely duplicate test identities in the upload (e.g. parameterized rows sharing a name). The most severe outcome is shown.`}
+                      className="ml-2 inline-flex items-center gap-1 rounded bg-skip/15 px-1.5 py-0.5 text-xs font-semibold text-skip align-middle"
+                    >
+                      <AppIcon name="alert" className="h-3 w-3" />
+                      {h.caseCount}× merged
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-2 text-muted">{h.branch ?? '—'}</td>
                 <td className="px-4 py-2 text-muted">{fmtDuration(h.durationMs)}</td>

@@ -56,4 +56,11 @@ export const projectMigrations: Migration[] = [
       );
     `,
   },
+  {
+    version: 2,
+    // How many raw test cases collapsed onto this (test_id, run_id). 1 = no
+    // collision; >1 flags duplicates merged at ingest (parameterized rows sharing
+    // an identity, genuine dup test names, or repeated uploads into one run).
+    sql: `ALTER TABLE results ADD COLUMN case_count INTEGER NOT NULL DEFAULT 1;`,
+  },
 ];
