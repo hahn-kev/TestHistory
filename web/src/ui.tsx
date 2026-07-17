@@ -170,6 +170,18 @@ export interface GitHubRunLinks {
  */
 const PR_REF = /^(\d+)\/(?:merge|head)$/;
 
+/** True when `branch` is a GitHub pull-request ref (`<n>/merge` or `<n>/head`). */
+export function isPrBranchRef(branch: string): boolean {
+  return PR_REF.test(branch);
+}
+
+/** Human-facing branch label: `2454/merge` → `PR #2454`; otherwise the raw branch. */
+export function branchLabel(branch: string | null | undefined): string {
+  if (!branch) return '';
+  const m = PR_REF.exec(branch);
+  return m ? `PR #${m[1]}` : branch;
+}
+
 export function githubRunLinks(run: {
   ciUrl: string | null;
   commitSha: string | null;
